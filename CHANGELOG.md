@@ -3,6 +3,10 @@
 All notable changes to Network Switch for Windows.
 本项目的重要变更都记在这里。
 
+## v1.1.1 — 2026-11-22
+
+- **Application icon / 应用图标**: the exe now embeds an icon — the same design as the tray icon (blue disc, two opposing white arrows) — so it no longer shows the generic blank file icon in Explorer. The icon ships in the repo as `icon.ico.b64` (base64 text, so the snapshot stays text-only); `build.cmd` decodes it and passes `/win32icon` to csc. No functional changes. / exe 嵌入了应用图标，与托盘图标同一设计（蓝圆底、双向白箭头），在资源管理器里不再是白板默认图标。图标以 `icon.ico.b64`（base64 文本）形式存放在仓库里，`build.cmd` 构建时解码并以 `/win32icon` 传给 csc。无功能变更。
+
 ## v1.1.0 — 2026-11-22
 
 - **About dialog / 关于对话框**: shows the version (read from the assembly, so it can never drift), `Idea: Otakun`, `Coding: Dash`, and a clickable link to this repository. / 显示版本号（从程序本体读取，永不写错）、`Idea: Otakun`、`Coding: Dash` 与可点击的 GitHub 仓库链接。

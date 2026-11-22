@@ -1,4 +1,6 @@
-// 网络切换 / Network Switch (Windows tray edition) v1.1.0
+// 网络切换 / Network Switch (Windows tray edition) v1.1.1
+// v1.1.1: embedded application icon for the exe (same design as the tray
+// icon: blue disc, two opposing white arrows); no functional changes.
 // v1.1.0: About dialog (Idea: Otakun, Coding: Dash, GitHub link, version
 // read from the assembly); Settings dialog with Start-at-logon (HKCU Run
 // key) and automatic update checks against GitHub Releases (notify-only
@@ -61,7 +63,7 @@ using System.Windows.Forms;
 [assembly: System.Reflection.AssemblyDescription("Switch the active network connection between two gateways on the same LAN from the system tray. Windows counterpart of swiftbar-network-switch.")]
 [assembly: System.Reflection.AssemblyCompany("Otakun and Dash")]
 [assembly: System.Reflection.AssemblyProduct("Network Switch")]
-[assembly: System.Reflection.AssemblyVersion("1.1.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.1.1.0")]
 
 namespace NetworkSwitch
 {
