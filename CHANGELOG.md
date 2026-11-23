@@ -3,6 +3,10 @@
 All notable changes to Network Switch for Windows.
 本项目的重要变更都记在这里。
 
+## v1.2.1 — 2026-11-23
+
+- **Status line names the measured profile / 状态行按实测归属**: the menu status line and the tray tooltip now show the profile whose exit the current gateway actually matches. When the connection matches no profile at all (e.g. a phone hotspot), they show just "Unknown" with no profile name — v1.2.0's "Home-Unknown" implied a relation to Home that does not exist. / 菜单状态行与托盘提示改为显示实测网关真正对上的那个 Profile。当现在的连接跟任何 Profile 都对不上时（例如手机热点），只显示「未知」，不带 Profile 名——v1.2.0 的「Home-未知」会让人误以为跟 Home 有关系，其实没有。
+
 ## v1.2.0 — 2026-11-23
 
 - **Proxy toggle / 代理开关**: a **Proxy** item now sits in the menu right under the Profiles. Click it and it gains a checkmark and the Windows system proxy switches on, pointing at the configured address; click again and the checkmark clears and the proxy switches off. The address lives in **Settings** as **Proxy IP** / **Proxy Port** text boxes, preset to `172.20.10.1` / `7890` — a phone hotspot sharing Clash Mi (mixed port). The checkmark reflects the real system state: it shows only when the system proxy is enabled and points at the configured address, and editing the address while the proxy is on re-points it immediately. / 菜单里两个 Profile 下面多了一个 **Proxy** 菜单项：点一下打勾，Windows 系统代理随即打开并指向设定地址；再点一下取消勾，代理关闭。地址在**设置**里以**代理 IP** / **代理端口**两个文本框填写，预设 `172.20.10.1` / `7890`——手机个人热点共享 Clash Mi（混合端口）的地址。勾选状态以系统真实状态为准：只有系统代理已启用且指向设定地址时才打勾；在代理开启时修改地址会立即改指新地址。

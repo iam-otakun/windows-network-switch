@@ -1,4 +1,9 @@
-// 网络切换 / Network Switch (Windows tray edition) v1.2.0
+// 网络切换 / Network Switch (Windows tray edition) v1.2.1
+// v1.2.1: the status line and tray tooltip now name the MEASURED
+// profile (the one whose exit the current gateway matches); when the
+// connection matches no profile at all (e.g. a phone hotspot) they
+// show just "Unknown" with no profile name - "Home-Unknown" implied a
+// relation to Home that does not exist.
 // v1.2.0: Proxy toggle in the menu under the Profiles (checkmark =
 // Windows system proxy on, pointing at the address set in Settings;
 // Settings gains Proxy IP / Proxy Port fields, preset 172.20.10.1:7890
@@ -73,7 +78,7 @@ using System.Windows.Forms;
 [assembly: System.Reflection.AssemblyDescription("Switch the active network connection between two gateways on the same LAN from the system tray. Windows counterpart of swiftbar-network-switch.")]
 [assembly: System.Reflection.AssemblyCompany("Otakun and Dash")]
 [assembly: System.Reflection.AssemblyProduct("Network Switch")]
-[assembly: System.Reflection.AssemblyVersion("1.2.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.2.1.0")]
 
 namespace NetworkSwitch
 {
@@ -84,6 +89,7 @@ namespace NetworkSwitch
         public static string DIRECT, OVERSEAS, UNKNOWN, GW, AUTO, DHCP, QUIT;
         public static string EDIT, DEL, ADD, NOTCONF, NOTCONF_TIP, NOTCONF_LINE;
         public static string TIP_FMT, STATUS_FMT, EXIT_FMT, IFACE_FMT;
+        public static string TIP_UNKNOWN_FMT, STATUS_UNKNOWN_FMT;
         public static string DLG_TITLE, NAME_PROMPT, NAME_LABEL;
         public static string CANCEL, SAVE, DELETE_BTN;
         public static string ABOUT, CLOSE, VERSION_FMT;
@@ -107,6 +113,8 @@ namespace NetworkSwitch
                 NOTCONF = "未配置"; NOTCONF_TIP = "还没有任何 Profile"; NOTCONF_LINE = "还没有 Profile，先添加一个";
                 TIP_FMT = "当前：{0}-{1}，网关 {2}，DNS {3}，网卡 {4}（{5}）";
                 STATUS_FMT = "当前：{0}-{1}（网关 {2}，DNS {3}）";
+                TIP_UNKNOWN_FMT = "当前：{0}，网关 {1}，DNS {2}，网卡 {3}（{4}）";
+                STATUS_UNKNOWN_FMT = "当前：{0}（网关 {1}，DNS {2}）";
                 EXIT_FMT = "{0}（网关 {1}，DNS {2}）";
                 IFACE_FMT = "网卡 {0}（{1}）";
                 DLG_TITLE = "网络切换 · Profile";
@@ -145,6 +153,8 @@ namespace NetworkSwitch
                 NOTCONF = "Not Configured"; NOTCONF_TIP = "No Profiles yet"; NOTCONF_LINE = "No Profiles yet - add one first";
                 TIP_FMT = "Current: {0}-{1}, gateway {2}, DNS {3}, adapter {4} ({5})";
                 STATUS_FMT = "Current: {0}-{1} (gateway {2}, DNS {3})";
+                TIP_UNKNOWN_FMT = "Current: {0}, gateway {1}, DNS {2}, adapter {3} ({4})";
+                STATUS_UNKNOWN_FMT = "Current: {0} (gateway {1}, DNS {2})";
                 EXIT_FMT = "{0} (gateway {1}, DNS {2})";
                 IFACE_FMT = "Adapter {0} ({1})";
                 DLG_TITLE = "Network Switch - Profile";
@@ -1004,13 +1014,6 @@ namespace NetworkSwitch
             return icon;
         }
 
-        string Mode()
-        {
-            int idx = Conf.IdxOf(Conf.Active);
-            if (idx < 0) return L.UNKNOWN;
-            return ModeFor(Conf.Profiles[idx]);
-        }
-
         // Measured mode of one profile: which of its exits (if any) the
         // current gateway actually is.
         string ModeFor(Profile p)
@@ -1020,17 +1023,34 @@ namespace NetworkSwitch
             return L.UNKNOWN;
         }
 
+        // The profile the current connection actually belongs to, by
+        // measured gateway - or null when it matches no profile at all
+        // (e.g. a phone hotspot). The status line names this profile,
+        // never the saved ACTIVE one, so "Home-Unknown" cannot appear.
+        Profile MeasuredProfile()
+        {
+            foreach (Profile p in Conf.Profiles)
+                if (ModeFor(p) != L.UNKNOWN) return p;
+            return null;
+        }
+
         string TrayText()
         {
             string t;
             if (Conf.Profiles.Count == 0)
                 t = L.NOTCONF + " - " + L.NOTCONF_TIP;
             else
-                t = string.Format(L.TIP_FMT, Conf.Active, Mode(),
-                    state.Gateway.Length > 0 ? state.Gateway : "-",
-                    state.Dns.Length > 0 ? state.Dns : L.AUTO,
-                    state.IfName.Length > 0 ? state.IfName : "-",
-                    state.IP.Length > 0 ? state.IP : "-");
+            {
+                string gw = state.Gateway.Length > 0 ? state.Gateway : "-";
+                string dns = state.Dns.Length > 0 ? state.Dns : L.AUTO;
+                string ifn = state.IfName.Length > 0 ? state.IfName : "-";
+                string ip = state.IP.Length > 0 ? state.IP : "-";
+                Profile mp = MeasuredProfile();
+                if (mp != null)
+                    t = string.Format(L.TIP_FMT, mp.Name, ModeFor(mp), gw, dns, ifn, ip);
+                else
+                    t = string.Format(L.TIP_UNKNOWN_FMT, L.UNKNOWN, gw, dns, ifn, ip);
+            }
             if (t.Length >= 64) t = t.Substring(0, 63); // NotifyIcon.Text limit
             return t;
         }
@@ -1053,9 +1073,16 @@ namespace NetworkSwitch
                 return;
             }
 
-            string status = string.Format(L.STATUS_FMT, Conf.Active, Mode(),
-                state.Gateway.Length > 0 ? state.Gateway : "-",
-                state.Dns.Length > 0 ? state.Dns : L.AUTO);
+            Profile mp = MeasuredProfile();
+            string status;
+            if (mp != null)
+                status = string.Format(L.STATUS_FMT, mp.Name, ModeFor(mp),
+                    state.Gateway.Length > 0 ? state.Gateway : "-",
+                    state.Dns.Length > 0 ? state.Dns : L.AUTO);
+            else
+                status = string.Format(L.STATUS_UNKNOWN_FMT, L.UNKNOWN,
+                    state.Gateway.Length > 0 ? state.Gateway : "-",
+                    state.Dns.Length > 0 ? state.Dns : L.AUTO);
             var stItem = new ToolStripMenuItem(status);
             stItem.Enabled = false;
             menu.Items.Add(stItem);
