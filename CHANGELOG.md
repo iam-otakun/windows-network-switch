@@ -3,6 +3,11 @@
 All notable changes to Network Switch for Windows.
 本项目的重要变更都记在这里。
 
+## v1.2.0 — 2026-11-23
+
+- **Proxy toggle / 代理开关**: a **Proxy** item now sits in the menu right under the Profiles. Click it and it gains a checkmark and the Windows system proxy switches on, pointing at the configured address; click again and the checkmark clears and the proxy switches off. The address lives in **Settings** as **Proxy IP** / **Proxy Port** text boxes, preset to `172.20.10.1` / `7890` — a phone hotspot sharing Clash Mi (mixed port). The checkmark reflects the real system state: it shows only when the system proxy is enabled and points at the configured address, and editing the address while the proxy is on re-points it immediately. / 菜单里两个 Profile 下面多了一个 **Proxy** 菜单项：点一下打勾，Windows 系统代理随即打开并指向设定地址；再点一下取消勾，代理关闭。地址在**设置**里以**代理 IP** / **代理端口**两个文本框填写，预设 `172.20.10.1` / `7890`——手机个人热点共享 Clash Mi（混合端口）的地址。勾选状态以系统真实状态为准：只有系统代理已启用且指向设定地址时才打勾；在代理开启时修改地址会立即改指新地址。
+- **Checkmarks follow the measured gateway / 勾选改按实测网关**: Profile and exit checkmarks are now computed from the gateway the machine actually has, per profile, instead of from the saved ACTIVE name. On a phone hotspot the menu used to show "Current: Home-Unknown" while Home still carried a checkmark; now nothing is checked on a foreign network, and after **Restore Automatic (DHCP)** a checkmark appears only if the DHCP-assigned gateway actually matches a profile exit. / Profile 与出口的勾选改由本机实测网关逐个 Profile 计算，不再看保存的 ACTIVE 名字。此前用手机热点上网时菜单显示「当前：Home-未知」，Home 项却还带着勾；现在身处陌生网络时一律不打勾，**恢复自动（DHCP）**之后也只有 DHCP 分到的网关确实对上某个 Profile 出口时才打勾。
+
 ## v1.1.1 — 2026-11-22
 
 - **Application icon / 应用图标**: the exe now embeds an icon — the same design as the tray icon (blue disc, two opposing white arrows) — so it no longer shows the generic blank file icon in Explorer. The icon ships in the repo as `icon.ico.b64` (base64 text, so the snapshot stays text-only); `build.cmd` decodes it and passes `/win32icon` to csc. No functional changes. / exe 嵌入了应用图标，与托盘图标同一设计（蓝圆底、双向白箭头），在资源管理器里不再是白板默认图标。图标以 `icon.ico.b64`（base64 文本）形式存放在仓库里，`build.cmd` 构建时解码并以 `/win32icon` 传给 csc。无功能变更。

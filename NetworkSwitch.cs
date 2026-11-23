@@ -1,4 +1,12 @@
-// 网络切换 / Network Switch (Windows tray edition) v1.1.1
+// 网络切换 / Network Switch (Windows tray edition) v1.2.0
+// v1.2.0: Proxy toggle in the menu under the Profiles (checkmark =
+// Windows system proxy on, pointing at the address set in Settings;
+// Settings gains Proxy IP / Proxy Port fields, preset 172.20.10.1:7890
+// for a phone-hotspot Clash share). Menu checkmarks are now driven by
+// the MEASURED gateway per profile, not by the saved ACTIVE name: on a
+// foreign network (e.g. a phone hotspot) nothing is checked, and after
+// Restore Automatic (DHCP) a check appears only if the DHCP gateway
+// actually matches a profile exit.
 // v1.1.1: embedded application icon for the exe (same design as the tray
 // icon: blue disc, two opposing white arrows); no functional changes.
 // v1.1.0: About dialog (Idea: Otakun, Coding: Dash, GitHub link, version
@@ -24,6 +32,8 @@
 //   PROFILE|Home|DIRECT_DNS|192.168.52.1
 //   PROFILE|Home|OVERSEAS_GW|192.168.52.2
 //   PROFILE|Home|OVERSEAS_DNS|192.168.52.2
+//   APP|PROXY_IP|172.20.10.1
+//   APP|PROXY_PORT|7890
 //
 // Behaviour mirrors the Mac version:
 //  - Tray text shows "Profile-Mode", e.g. Home-出海.
@@ -63,7 +73,7 @@ using System.Windows.Forms;
 [assembly: System.Reflection.AssemblyDescription("Switch the active network connection between two gateways on the same LAN from the system tray. Windows counterpart of swiftbar-network-switch.")]
 [assembly: System.Reflection.AssemblyCompany("Otakun and Dash")]
 [assembly: System.Reflection.AssemblyProduct("Network Switch")]
-[assembly: System.Reflection.AssemblyVersion("1.1.1.0")]
+[assembly: System.Reflection.AssemblyVersion("1.2.0.0")]
 
 namespace NetworkSwitch
 {
@@ -78,6 +88,7 @@ namespace NetworkSwitch
         public static string CANCEL, SAVE, DELETE_BTN;
         public static string ABOUT, CLOSE, VERSION_FMT;
         public static string SETTINGS, AUTOSTART_TXT, AUTOUPDATE_TXT, CHECK_UPDATE;
+        public static string PROXY, PROXY_IP, PROXY_PORT, BAD_PORT;
         public static string UPDATE_NONE, UPDATE_FOUND_Q, UPDATE_TITLE, UPDATE_FAIL_FMT, UPDATE_MENU_FMT, UPDATE_NOASSET;
         public static string SWITCH_FAIL, NO_IP_FMT, SWITCH_CANCELLED, SWITCH_ERR_FMT;
         public static string NOT_SAVED, NOT_ADDED, CANT_DELETE;
@@ -106,6 +117,8 @@ namespace NetworkSwitch
                 SETTINGS = "设置"; AUTOSTART_TXT = "开机自动启动";
                 AUTOUPDATE_TXT = "自动检查更新（仅提醒，不自动安装）";
                 CHECK_UPDATE = "检查更新…";
+                PROXY = "Proxy"; PROXY_IP = "代理 IP"; PROXY_PORT = "代理端口";
+                BAD_PORT = "端口不对，应为 1–65535 之间的数字。";
                 UPDATE_NONE = "已是最新版本（{0}）";
                 UPDATE_FOUND_Q = "发现新版本 {0}（当前 {1}），现在更新吗？";
                 UPDATE_TITLE = "网络切换 · 更新";
@@ -142,6 +155,8 @@ namespace NetworkSwitch
                 SETTINGS = "Settings"; AUTOSTART_TXT = "Start at logon";
                 AUTOUPDATE_TXT = "Check for updates automatically (notify only)";
                 CHECK_UPDATE = "Check for Updates...";
+                PROXY = "Proxy"; PROXY_IP = "Proxy IP"; PROXY_PORT = "Proxy Port";
+                BAD_PORT = "The port must be a number between 1 and 65535.";
                 UPDATE_NONE = "You are up to date ({0})";
                 UPDATE_FOUND_Q = "Version {0} is available (current {1}). Update now?";
                 UPDATE_TITLE = "Network Switch - Update";
@@ -178,12 +193,15 @@ namespace NetworkSwitch
         public static bool AutoStart = false;
         public static bool AutoUpdate = true;
         public static string LastCheck = "";
+        public static string ProxyIp = "172.20.10.1";
+        public static string ProxyPort = "7890";
 
         public static void Load()
         {
             Profiles = new List<Profile>();
             Active = "";
             AutoStart = false; AutoUpdate = true; LastCheck = "";
+            ProxyIp = "172.20.10.1"; ProxyPort = "7890";
             if (!File.Exists(Path)) return;
             var map = new Dictionary<string, Profile>();
             var order = new List<string>();
@@ -202,6 +220,8 @@ namespace NetworkSwitch
                         if (ap[1] == "AUTOSTART") AutoStart = ap[2] == "1";
                         else if (ap[1] == "AUTOUPDATE") AutoUpdate = ap[2] == "1";
                         else if (ap[1] == "LASTCHECK") LastCheck = ap[2];
+                        else if (ap[1] == "PROXY_IP") ProxyIp = ap[2];
+                        else if (ap[1] == "PROXY_PORT") ProxyPort = ap[2];
                     }
                 }
                 else if (line.StartsWith("PROFILE|"))
@@ -233,6 +253,8 @@ namespace NetworkSwitch
             lines.Add("ACTIVE=" + Active);
             lines.Add("APP|AUTOSTART|" + (AutoStart ? "1" : "0"));
             lines.Add("APP|AUTOUPDATE|" + (AutoUpdate ? "1" : "0"));
+            lines.Add("APP|PROXY_IP|" + ProxyIp);
+            lines.Add("APP|PROXY_PORT|" + ProxyPort);
             if (LastCheck.Length > 0) lines.Add("APP|LASTCHECK|" + LastCheck);
             foreach (Profile p in Profiles)
             {
@@ -475,6 +497,61 @@ namespace NetworkSwitch
         }
     }
 
+    // ---------------- system proxy (WinINET, per-user) ----------------
+    static class ProxyCtl
+    {
+        const string KeyPath = @"Software\Microsoft\Windows\CurrentVersion\Internet Settings";
+        const int INTERNET_OPTION_SETTINGS_CHANGED = 39;
+        const int INTERNET_OPTION_REFRESH = 37;
+
+        [DllImport("wininet.dll", SetLastError = true)]
+        static extern bool InternetSetOption(IntPtr hInternet, int dwOption, IntPtr lpBuffer, int dwBufferLength);
+
+        public static string ServerString()
+        {
+            return Conf.ProxyIp + ":" + Conf.ProxyPort;
+        }
+
+        // "On" means: the system proxy is enabled AND points at the
+        // address configured in Settings. A proxy set by another app
+        // (different server string) does not count as on here.
+        public static bool IsOn()
+        {
+            try
+            {
+                var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(KeyPath, false);
+                if (key == null) return false;
+                int en = Convert.ToInt32(key.GetValue("ProxyEnable", 0));
+                string srv = key.GetValue("ProxyServer", "") as string;
+                key.Close();
+                return en == 1 && srv == ServerString();
+            }
+            catch { return false; }
+        }
+
+        public static void Set(bool on)
+        {
+            try
+            {
+                var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(KeyPath, true);
+                if (key == null) return;
+                if (on)
+                {
+                    key.SetValue("ProxyServer", ServerString());
+                    key.SetValue("ProxyEnable", 1, Microsoft.Win32.RegistryValueKind.DWord);
+                }
+                else
+                {
+                    key.SetValue("ProxyEnable", 0, Microsoft.Win32.RegistryValueKind.DWord);
+                }
+                key.Close();
+                InternetSetOption(IntPtr.Zero, INTERNET_OPTION_SETTINGS_CHANGED, IntPtr.Zero, 0);
+                InternetSetOption(IntPtr.Zero, INTERNET_OPTION_REFRESH, IntPtr.Zero, 0);
+            }
+            catch { }
+        }
+    }
+
     class ReleaseInfo
     {
         public Version Version;
@@ -666,6 +743,7 @@ namespace NetworkSwitch
     class SettingsForm : Form
     {
         CheckBox cbAutoStart, cbAutoUpdate;
+        TextBox tbProxyIp, tbProxyPort;
         public bool CheckRequested = false;
 
         public SettingsForm()
@@ -674,40 +752,43 @@ namespace NetworkSwitch
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false; MinimizeBox = false;
             StartPosition = FormStartPosition.CenterScreen;
-            ClientSize = new Size(360, 172);
+            ClientSize = new Size(360, 236);
             Font = new Font("Microsoft YaHei UI", 9f);
 
             cbAutoStart = new CheckBox();
             cbAutoStart.Text = L.AUTOSTART_TXT;
-            cbAutoStart.Location = new Point(16, 16);
+            cbAutoStart.Location = new Point(16, 14);
             cbAutoStart.Size = new Size(328, 22);
             cbAutoStart.Checked = Conf.AutoStart;
             Controls.Add(cbAutoStart);
 
             cbAutoUpdate = new CheckBox();
             cbAutoUpdate.Text = L.AUTOUPDATE_TXT;
-            cbAutoUpdate.Location = new Point(16, 46);
+            cbAutoUpdate.Location = new Point(16, 42);
             cbAutoUpdate.Size = new Size(328, 22);
             cbAutoUpdate.Checked = Conf.AutoUpdate;
             Controls.Add(cbAutoUpdate);
 
+            tbProxyIp = AddRow(L.PROXY_IP, 76, Conf.ProxyIp);
+            tbProxyPort = AddRow(L.PROXY_PORT, 106, Conf.ProxyPort);
+
             var btnCheck = new Button();
             btnCheck.Text = L.CHECK_UPDATE;
-            btnCheck.Location = new Point(16, 84);
+            btnCheck.Location = new Point(16, 146);
             btnCheck.Size = new Size(140, 28);
-            btnCheck.Click += delegate { SaveSettings(); CheckRequested = true; DialogResult = DialogResult.OK; Close(); };
+            btnCheck.Click += delegate { if (!SaveSettings()) return; CheckRequested = true; DialogResult = DialogResult.OK; Close(); };
             Controls.Add(btnCheck);
 
             var btnOk = new Button();
             btnOk.Text = L.SAVE;
-            btnOk.Location = new Point(176, 128);
+            btnOk.Location = new Point(176, 192);
             btnOk.Size = new Size(80, 28);
-            btnOk.Click += delegate { SaveSettings(); DialogResult = DialogResult.OK; Close(); };
+            btnOk.Click += delegate { if (!SaveSettings()) return; DialogResult = DialogResult.OK; Close(); };
             Controls.Add(btnOk);
 
             var btnCancel = new Button();
             btnCancel.Text = L.CANCEL;
-            btnCancel.Location = new Point(264, 128);
+            btnCancel.Location = new Point(264, 192);
             btnCancel.Size = new Size(80, 28);
             btnCancel.DialogResult = DialogResult.Cancel;
             Controls.Add(btnCancel);
@@ -716,12 +797,48 @@ namespace NetworkSwitch
             CancelButton = btnCancel;
         }
 
-        void SaveSettings()
+        TextBox AddRow(string label, int y, string value)
         {
+            var lbl = new Label();
+            lbl.Text = label;
+            lbl.Location = new Point(16, y + 3);
+            lbl.Size = new Size(100, 18);
+            Controls.Add(lbl);
+            var tb = new TextBox();
+            tb.Text = value;
+            tb.Location = new Point(120, y);
+            tb.Size = new Size(224, 24);
+            Controls.Add(tb);
+            return tb;
+        }
+
+        // Returns false (and keeps the dialog open) on invalid input.
+        bool SaveSettings()
+        {
+            string ip = tbProxyIp.Text.Trim();
+            string port = tbProxyPort.Text.Trim();
+            if (!Net.ValidIp(ip))
+            {
+                MessageBox.Show(L.BAD_IP, L.SETTINGS, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return false;
+            }
+            int portNum;
+            if (!int.TryParse(port, out portNum) || portNum < 1 || portNum > 65535)
+            {
+                MessageBox.Show(L.BAD_PORT, L.SETTINGS, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return false;
+            }
+            // If our proxy is currently switched on, re-point it at the
+            // new address right away so the menu check stays truthful.
+            bool wasOn = ProxyCtl.IsOn();
             Conf.AutoStart = cbAutoStart.Checked;
             Conf.AutoUpdate = cbAutoUpdate.Checked;
+            Conf.ProxyIp = ip;
+            Conf.ProxyPort = port;
             Conf.Save();
             Startup.Apply(Conf.AutoStart);
+            if (wasOn) ProxyCtl.Set(true);
+            return true;
         }
     }
 
@@ -891,7 +1008,13 @@ namespace NetworkSwitch
         {
             int idx = Conf.IdxOf(Conf.Active);
             if (idx < 0) return L.UNKNOWN;
-            Profile p = Conf.Profiles[idx];
+            return ModeFor(Conf.Profiles[idx]);
+        }
+
+        // Measured mode of one profile: which of its exits (if any) the
+        // current gateway actually is.
+        string ModeFor(Profile p)
+        {
             if (state.Gateway == p.DGw) return L.DIRECT;
             if (state.Gateway == p.OGw) return L.OVERSEAS;
             return L.UNKNOWN;
@@ -951,18 +1074,22 @@ namespace NetworkSwitch
                 menu.Items.Add(new ToolStripSeparator());
             }
 
-            string mode = Mode();
             foreach (Profile p in Conf.Profiles)
             {
                 Profile prof = p;
+                // Checkmarks follow the MEASURED gateway for this profile,
+                // never the saved ACTIVE name: on a foreign network (phone
+                // hotspot, DHCP after Restore Automatic, ...) nothing is
+                // checked unless the gateway really matches an exit.
+                string pMode = ModeFor(prof);
                 var item = new ToolStripMenuItem(prof.Name);
-                item.Checked = prof.Name == Conf.Active;
+                item.Checked = pMode != L.UNKNOWN;
                 var dItem = new ToolStripMenuItem(string.Format(L.EXIT_FMT, L.DIRECT, prof.DGw, prof.DDns));
-                dItem.Checked = prof.Name == Conf.Active && mode == L.DIRECT;
+                dItem.Checked = pMode == L.DIRECT;
                 dItem.Click += delegate { SwitchTo(prof, true); };
                 item.DropDownItems.Add(dItem);
                 var oItem = new ToolStripMenuItem(string.Format(L.EXIT_FMT, L.OVERSEAS, prof.OGw, prof.ODns));
-                oItem.Checked = prof.Name == Conf.Active && mode == L.OVERSEAS;
+                oItem.Checked = pMode == L.OVERSEAS;
                 oItem.Click += delegate { SwitchTo(prof, false); };
                 item.DropDownItems.Add(oItem);
                 item.DropDownItems.Add(new ToolStripSeparator());
@@ -974,6 +1101,11 @@ namespace NetworkSwitch
                 item.DropDownItems.Add(delItem);
                 menu.Items.Add(item);
             }
+
+            var proxyItem = new ToolStripMenuItem(L.PROXY);
+            proxyItem.Checked = ProxyCtl.IsOn();
+            proxyItem.Click += delegate { ToggleProxy(); };
+            menu.Items.Add(proxyItem);
 
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add(MakeItem(L.ADD, delegate { AddProfile(); }));
@@ -1015,6 +1147,12 @@ namespace NetworkSwitch
             Apply.Invoke(state.IfName, true, "", "", "", "");
             state = Net.Detect();
             tray.Text = TrayText();
+        }
+
+        void ToggleProxy()
+        {
+            ProxyCtl.Set(!ProxyCtl.IsOn());
+            Rebuild();
         }
 
         void AddProfile()

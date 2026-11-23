@@ -15,6 +15,8 @@ Some networks have two ways out living on the same subnet — for example a camp
 - **Add Profile…** in the menu creates a new Profile: a name plus a gateway and a DNS field for each exit, with IPv4 validation. Each Profile's submenu also carries **Edit** (rename included) and **Delete**. / 菜单里的**添加 Profile…**即可新建：一个名字，外加每个出口各一组网关与 DNS，带 IPv4 格式校验。每个 Profile 的子菜单里还有**编辑**（含改名）与**删除**。
 - **The adapter and this machine's own IP are detected automatically**: the adapter follows the current default route, and switching keeps the IP and subnet mask the machine already has, changing only the gateway and DNS. / **网卡与本机 IP 全自动检测**：网卡认当前默认路由的那块，切换时沿用本机已有的 IP 与掩码，只改网关与 DNS。
 - A **Restore Automatic (DHCP)** item puts the connection back to automatic when you want out. / 菜单里有**恢复自动（DHCP）**，想回到全自动时点它。
+- A **Proxy** item under the Profiles toggles the Windows system proxy: one click turns it on (checkmark) pointing at the address set in **Settings** (**Proxy IP** / **Proxy Port**, preset `172.20.10.1` / `7890` — e.g. a phone hotspot sharing Clash Mi), the next click turns it off. / Profile 下面有一个 **Proxy** 菜单项，切换 Windows 系统代理：点一下打开（打勾）并指向**设置**里的地址（**代理 IP** / **代理端口**，预设 `172.20.10.1` / `7890`，例如手机个人热点共享的 Clash Mi），再点一下关闭。
+- Menu checkmarks follow the gateway the machine actually has: on a foreign network nothing is checked, never a stale checkmark from the last profile used. / 菜单勾选以本机实测网关为准：身处陌生网络时不打勾，绝不残留上一个 Profile 的勾。
 - **Settings** offers **Start at logon** and an automatic daily update check (notify only). Updates are never installed silently: a found update appears as a menu item and balloon, and installs only after you confirm. A manual **Check for Updates…** lives in the same dialog. / **设置**里有**开机自动启动**与每天一次的自动检查更新（仅提醒）。更新永不静默安装：发现新版会以菜单项和气泡提示，点确认后才下载替换。手动**检查更新…**也在同一个对话框里。
 - The **About** dialog shows the version, credits and a link to this repository. / **关于**对话框里有版本号、作者信息与本仓库链接。
 - The UI language follows the system (Chinese systems get Chinese, everything else English); `NETSWITCH_LANG` overrides. / 界面语言跟随系统（中文系统用中文，其它用英文）；环境变量 `NETSWITCH_LANG` 可覆盖。
@@ -64,6 +66,8 @@ C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe /target:winexe /out:Netw
 ACTIVE=Home
 APP|AUTOSTART|1
 APP|AUTOUPDATE|1
+APP|PROXY_IP|172.20.10.1
+APP|PROXY_PORT|7890
 PROFILE|Home|DIRECT_GW|192.168.52.1
 PROFILE|Home|DIRECT_DNS|192.168.52.1
 PROFILE|Home|OVERSEAS_GW|192.168.52.2
