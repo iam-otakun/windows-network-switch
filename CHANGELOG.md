@@ -3,6 +3,10 @@
 All notable changes to Network Switch for Windows.
 本项目的重要变更都记在这里。
 
+## v1.2.2 — 2026-11-23
+
+- **Proxy and Profiles are mutually exclusive / Proxy 与 Profile 互斥**: while the Proxy is on, both exits (Direct / Overseas) of every Profile are greyed out and cannot be selected — proxy mode borrows another device's Clash, so the local gateway must stay exactly as the LAN or hotspot assigned it; pinning a profile gateway at the same time would contradict that. Turning the Proxy off makes the exits selectable again. Edit and Delete stay available either way; they do not touch the network. / Proxy 打开时，所有 Profile 的两个出口（直连 / 出海）都变灰、不可选——代理模式是借道另一台设备的 Clash，本机网关必须原样保留局域网或热点分给它的样子，此时再钉一个 Profile 网关就自相矛盾了。关掉 Proxy，出口立即恢复可选。编辑与删除不受影响，它们不动网络。
+
 ## v1.2.1 — 2026-11-23
 
 - **Status line names the measured profile / 状态行按实测归属**: the menu status line and the tray tooltip now show the profile whose exit the current gateway actually matches. When the connection matches no profile at all (e.g. a phone hotspot), they show just "Unknown" with no profile name — v1.2.0's "Home-Unknown" implied a relation to Home that does not exist. / 菜单状态行与托盘提示改为显示实测网关真正对上的那个 Profile。当现在的连接跟任何 Profile 都对不上时（例如手机热点），只显示「未知」，不带 Profile 名——v1.2.0 的「Home-未知」会让人误以为跟 Home 有关系，其实没有。

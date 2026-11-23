@@ -1,4 +1,8 @@
-// 网络切换 / Network Switch (Windows tray edition) v1.2.1
+// 网络切换 / Network Switch (Windows tray edition) v1.2.2
+// v1.2.2: Proxy mode and profile switching are mutually exclusive -
+// while the proxy is on, both exits of every profile are greyed out
+// (the local gateway must stay as the LAN/hotspot gave it); Edit and
+// Delete stay available.
 // v1.2.1: the status line and tray tooltip now name the MEASURED
 // profile (the one whose exit the current gateway matches); when the
 // connection matches no profile at all (e.g. a phone hotspot) they
@@ -78,7 +82,7 @@ using System.Windows.Forms;
 [assembly: System.Reflection.AssemblyDescription("Switch the active network connection between two gateways on the same LAN from the system tray. Windows counterpart of swiftbar-network-switch.")]
 [assembly: System.Reflection.AssemblyCompany("Otakun and Dash")]
 [assembly: System.Reflection.AssemblyProduct("Network Switch")]
-[assembly: System.Reflection.AssemblyVersion("1.2.1.0")]
+[assembly: System.Reflection.AssemblyVersion("1.2.2.0")]
 
 namespace NetworkSwitch
 {
@@ -1101,6 +1105,7 @@ namespace NetworkSwitch
                 menu.Items.Add(new ToolStripSeparator());
             }
 
+            bool proxyOn = ProxyCtl.IsOn();
             foreach (Profile p in Conf.Profiles)
             {
                 Profile prof = p;
@@ -1111,12 +1116,20 @@ namespace NetworkSwitch
                 string pMode = ModeFor(prof);
                 var item = new ToolStripMenuItem(prof.Name);
                 item.Checked = pMode != L.UNKNOWN;
+                // Proxy mode and gateway switching are mutually exclusive:
+                // with the proxy on, the connection borrows another
+                // device's Clash and the local gateway must stay as the
+                // LAN/hotspot gave it - pinning a profile gateway would
+                // contradict that, so both exits are greyed out. Edit and
+                // Delete stay available; they do not touch the network.
                 var dItem = new ToolStripMenuItem(string.Format(L.EXIT_FMT, L.DIRECT, prof.DGw, prof.DDns));
                 dItem.Checked = pMode == L.DIRECT;
+                dItem.Enabled = !proxyOn;
                 dItem.Click += delegate { SwitchTo(prof, true); };
                 item.DropDownItems.Add(dItem);
                 var oItem = new ToolStripMenuItem(string.Format(L.EXIT_FMT, L.OVERSEAS, prof.OGw, prof.ODns));
                 oItem.Checked = pMode == L.OVERSEAS;
+                oItem.Enabled = !proxyOn;
                 oItem.Click += delegate { SwitchTo(prof, false); };
                 item.DropDownItems.Add(oItem);
                 item.DropDownItems.Add(new ToolStripSeparator());
@@ -1130,7 +1143,7 @@ namespace NetworkSwitch
             }
 
             var proxyItem = new ToolStripMenuItem(L.PROXY);
-            proxyItem.Checked = ProxyCtl.IsOn();
+            proxyItem.Checked = proxyOn;
             proxyItem.Click += delegate { ToggleProxy(); };
             menu.Items.Add(proxyItem);
 
