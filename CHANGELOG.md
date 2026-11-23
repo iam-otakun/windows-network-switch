@@ -3,6 +3,10 @@
 All notable changes to Network Switch for Windows.
 本项目的重要变更都记在这里。
 
+## v1.2.3 — 2026-11-23
+
+- **Mutual exclusion, both directions / 互斥补全反方向**: the Proxy item is now also greyed out while the measured gateway matches a Profile exit — in profile mode the configured proxy address (e.g. the phone hotspot's `172.20.10.1`) belongs to a foreign network and is not even reachable, so switching the proxy on there cannot work. The way back is **Restore Automatic (DHCP)** or moving to a network that matches no Profile. The Proxy item stays clickable while the proxy is on (it is how you switch it off) and on foreign networks. Net effect: gateway mode and proxy mode are two mutually exclusive ways out, and every transition passes through the neutral state. / 当实测网关对上某个 Profile 出口时（网关模式），Proxy 菜单项同样变灰——那个模式下设定里的代理地址（如手机热点的 `172.20.10.1`）属于另一个网络，在这里根本够不着，开了也没用。回中立态的路是**恢复自动（DHCP）**，或换到对不上任何 Profile 的网络。Proxy 开着时它本身永远可点（要靠它关），在陌生网络上也可点。最终效果：网关模式与代理模式是两个互斥的出口，任何切换都必须经过中立态。
+
 ## v1.2.2 — 2026-11-23
 
 - **Proxy and Profiles are mutually exclusive / Proxy 与 Profile 互斥**: while the Proxy is on, both exits (Direct / Overseas) of every Profile are greyed out and cannot be selected — proxy mode borrows another device's Clash, so the local gateway must stay exactly as the LAN or hotspot assigned it; pinning a profile gateway at the same time would contradict that. Turning the Proxy off makes the exits selectable again. Edit and Delete stay available either way; they do not touch the network. / Proxy 打开时，所有 Profile 的两个出口（直连 / 出海）都变灰、不可选——代理模式是借道另一台设备的 Clash，本机网关必须原样保留局域网或热点分给它的样子，此时再钉一个 Profile 网关就自相矛盾了。关掉 Proxy，出口立即恢复可选。编辑与删除不受影响，它们不动网络。

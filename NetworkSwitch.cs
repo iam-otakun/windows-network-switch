@@ -1,4 +1,8 @@
-// 网络切换 / Network Switch (Windows tray edition) v1.2.2
+// 网络切换 / Network Switch (Windows tray edition) v1.2.3
+// v1.2.3: the mutual exclusion is symmetric - while the measured
+// gateway matches a profile exit (profile mode), the Proxy item is
+// greyed out too; it stays clickable while the proxy is on (to switch
+// it off) and on networks matching no profile (the hotspot case).
 // v1.2.2: Proxy mode and profile switching are mutually exclusive -
 // while the proxy is on, both exits of every profile are greyed out
 // (the local gateway must stay as the LAN/hotspot gave it); Edit and
@@ -82,7 +86,7 @@ using System.Windows.Forms;
 [assembly: System.Reflection.AssemblyDescription("Switch the active network connection between two gateways on the same LAN from the system tray. Windows counterpart of swiftbar-network-switch.")]
 [assembly: System.Reflection.AssemblyCompany("Otakun and Dash")]
 [assembly: System.Reflection.AssemblyProduct("Network Switch")]
-[assembly: System.Reflection.AssemblyVersion("1.2.2.0")]
+[assembly: System.Reflection.AssemblyVersion("1.2.3.0")]
 
 namespace NetworkSwitch
 {
@@ -1144,6 +1148,14 @@ namespace NetworkSwitch
 
             var proxyItem = new ToolStripMenuItem(L.PROXY);
             proxyItem.Checked = proxyOn;
+            // The exclusion runs both ways: while the measured gateway
+            // matches a profile exit, the connection is in profile mode
+            // and the Proxy cannot be switched on (the proxy address
+            // belongs to a foreign network, e.g. the phone hotspot, and
+            // is not even reachable from here). Restore Automatic (DHCP)
+            // is the way back to neutral. While the proxy is ON the item
+            // itself always stays enabled - it is how you switch it off.
+            proxyItem.Enabled = proxyOn || MeasuredProfile() == null;
             proxyItem.Click += delegate { ToggleProxy(); };
             menu.Items.Add(proxyItem);
 
