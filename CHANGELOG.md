@@ -3,6 +3,10 @@
 All notable changes to Network Switch for Windows.
 本项目的重要变更都记在这里。
 
+## v1.2.6 — 2026-11-24
+
+- **No more submenus / 子菜单取消**: each Profile used to be a clickable-looking menu item that opened a submenu with its exits plus Edit and Delete — yet the Profile item itself selected nothing. Now each Profile is a **greyed, non-clickable header** in the menu, with its **Direct** and **Overseas** exits listed flat beneath it as ordinary items (checkmarks, proxy greying and switching unchanged). **Edit** (rename included) and **Delete** moved into **Settings…**, which gains a Profiles list with Edit / Delete buttons at the bottom — configuration belongs in Settings, the menu keeps only switching actions. **Add Profile...** stays in the menu. / 从前每个 Profile 是一个看似可点的菜单项，点开子菜单才是它的两个出口外加编辑、删除——可这个项本身什么都不选。现在每个 Profile 是菜单里一行**变灰、不可点的标题**，**直连**与**出海**两个出口平铺在标题下方，就是普通菜单项（勾选、Proxy 互斥变灰、切换行为都不变）。**编辑**（含改名）与**删除**搬进**设置…**，设置底部新增 Profiles 列表与编辑 / 删除按钮——配置归设置，菜单只留切换动作。**添加 Profile…** 仍留在菜单里。
+
 ## v1.2.5 — 2026-11-24
 
 - **Menu layout aligned with BingWallpaper / 菜单分组与 BingWallpaper 对齐**: the tray menu's last group is now always **Settings… / Check for Updates... / About… / Quit**, with the functional items in the groups above it — **Add Profile...** and **Restore Automatic (DHCP)** form their own group, followed by a separator. **Check for Updates...** is new as a menu item (it previously lived only inside the Settings dialog) and runs the same manual check; the stray separator that used to sit between About and Quit is gone. Same regrouping in the not-configured menu. / 托盘菜单的最后一组从此固定为 **设置… / 检查更新… / 关于… / 退出**，功能项都归到上面的组：**添加 Profile…** 与 **恢复自动（DHCP）** 自成一组，其后加分割线。**检查更新…** 新增为菜单项（此前只藏在设置对话框里），跑的是同一个手动检查；About 与 Quit 之间那条多余的分割线去掉。未配置状态下的菜单同样重新分组。

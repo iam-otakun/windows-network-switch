@@ -60,8 +60,10 @@
 //  - Applying runs elevated (UAC) per switch, like the Mac version's
 //    administrator-privileges prompt; cancelling UAC is reported
 //    separately from a real failure, and failures show the system text.
-//  - Profiles can be added / edited (rename included) / deleted from
-//    the menu; at least one profile must remain.
+//  - Profiles are added from the menu; editing (rename included) and
+//    deleting live in Settings...; at least one profile must remain.
+//    In the menu each Profile is a greyed header with its two exits
+//    listed flat beneath it - no submenus.
 //  - "Restore Automatic (DHCP)" returns address and DNS to automatic.
 //  - UI language follows the system (zh -> Chinese, otherwise English);
 //    NETSWITCH_LANG overrides.
@@ -90,7 +92,7 @@ using System.Windows.Forms;
 [assembly: System.Reflection.AssemblyDescription("Switch the active network connection between two gateways on the same LAN from the system tray. Windows counterpart of swiftbar-network-switch.")]
 [assembly: System.Reflection.AssemblyCompany("Otakun and Dash")]
 [assembly: System.Reflection.AssemblyProduct("Network Switch")]
-[assembly: System.Reflection.AssemblyVersion("1.2.5.0")]
+[assembly: System.Reflection.AssemblyVersion("1.2.6.0")]
 
 namespace NetworkSwitch
 {
@@ -104,6 +106,7 @@ namespace NetworkSwitch
         public static string TIP_UNKNOWN_FMT, STATUS_UNKNOWN_FMT;
         public static string DLG_TITLE, NAME_PROMPT, NAME_LABEL;
         public static string CANCEL, SAVE, DELETE_BTN;
+        public static string PROFILES_LABEL, EDIT_BTN;
         public static string ABOUT, CLOSE, VERSION_FMT;
         public static string SETTINGS, AUTOSTART_TXT, AUTOUPDATE_TXT, CHECK_UPDATE;
         public static string PROXY, PROXY_IP, PROXY_PORT, BAD_PORT;
@@ -133,6 +136,7 @@ namespace NetworkSwitch
                 NAME_PROMPT = "Profile 名称（例如 Home、Office）";
                 NAME_LABEL = "名称";
                 CANCEL = "取消"; SAVE = "保存"; DELETE_BTN = "删除";
+                PROFILES_LABEL = "Profiles："; EDIT_BTN = "编辑…";
                 ABOUT = "关于"; CLOSE = "关闭"; VERSION_FMT = "版本 {0}";
                 SETTINGS = "设置"; AUTOSTART_TXT = "开机自动启动";
                 AUTOUPDATE_TXT = "自动检查更新（仅提醒，不自动安装）";
@@ -173,6 +177,7 @@ namespace NetworkSwitch
                 NAME_PROMPT = "Profile name (e.g. Home, Office)";
                 NAME_LABEL = "Name";
                 CANCEL = "Cancel"; SAVE = "Save"; DELETE_BTN = "Delete";
+                PROFILES_LABEL = "Profiles:"; EDIT_BTN = "Edit...";
                 ABOUT = "About"; CLOSE = "Close"; VERSION_FMT = "Version {0}";
                 SETTINGS = "Settings"; AUTOSTART_TXT = "Start at logon";
                 AUTOUPDATE_TXT = "Check for updates automatically (notify only)";
@@ -766,6 +771,7 @@ namespace NetworkSwitch
     {
         CheckBox cbAutoStart, cbAutoUpdate;
         TextBox tbProxyIp, tbProxyPort;
+        ListBox lbProfiles;
         public bool CheckRequested = false;
 
         public SettingsForm()
@@ -774,7 +780,7 @@ namespace NetworkSwitch
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false; MinimizeBox = false;
             StartPosition = FormStartPosition.CenterScreen;
-            ClientSize = new Size(360, 236);
+            ClientSize = new Size(360, 350);
             Font = new Font("Microsoft YaHei UI", 9f);
 
             cbAutoStart = new CheckBox();
@@ -794,23 +800,51 @@ namespace NetworkSwitch
             tbProxyIp = AddRow(L.PROXY_IP, 76, Conf.ProxyIp);
             tbProxyPort = AddRow(L.PROXY_PORT, 106, Conf.ProxyPort);
 
+            var lblProfiles = new Label();
+            lblProfiles.Text = L.PROFILES_LABEL;
+            lblProfiles.Location = new Point(16, 142);
+            lblProfiles.Size = new Size(200, 18);
+            Controls.Add(lblProfiles);
+
+            lbProfiles = new ListBox();
+            lbProfiles.Location = new Point(16, 164);
+            lbProfiles.Size = new Size(216, 82);
+            lbProfiles.DoubleClick += delegate { EditSelectedProfile(); };
+            Controls.Add(lbProfiles);
+
+            var btnEditP = new Button();
+            btnEditP.Text = L.EDIT_BTN;
+            btnEditP.Location = new Point(240, 164);
+            btnEditP.Size = new Size(104, 28);
+            btnEditP.Click += delegate { EditSelectedProfile(); };
+            Controls.Add(btnEditP);
+
+            var btnDelP = new Button();
+            btnDelP.Text = L.DELETE_BTN;
+            btnDelP.Location = new Point(240, 198);
+            btnDelP.Size = new Size(104, 28);
+            btnDelP.Click += delegate { DeleteSelectedProfile(); };
+            Controls.Add(btnDelP);
+
+            FillProfiles();
+
             var btnCheck = new Button();
             btnCheck.Text = L.CHECK_UPDATE;
-            btnCheck.Location = new Point(16, 146);
+            btnCheck.Location = new Point(16, 262);
             btnCheck.Size = new Size(140, 28);
             btnCheck.Click += delegate { if (!SaveSettings()) return; CheckRequested = true; DialogResult = DialogResult.OK; Close(); };
             Controls.Add(btnCheck);
 
             var btnOk = new Button();
             btnOk.Text = L.SAVE;
-            btnOk.Location = new Point(176, 192);
+            btnOk.Location = new Point(176, 306);
             btnOk.Size = new Size(80, 28);
             btnOk.Click += delegate { if (!SaveSettings()) return; DialogResult = DialogResult.OK; Close(); };
             Controls.Add(btnOk);
 
             var btnCancel = new Button();
             btnCancel.Text = L.CANCEL;
-            btnCancel.Location = new Point(264, 192);
+            btnCancel.Location = new Point(264, 306);
             btnCancel.Size = new Size(80, 28);
             btnCancel.DialogResult = DialogResult.Cancel;
             Controls.Add(btnCancel);
@@ -832,6 +866,57 @@ namespace NetworkSwitch
             tb.Size = new Size(224, 24);
             Controls.Add(tb);
             return tb;
+        }
+
+        void FillProfiles()
+        {
+            lbProfiles.Items.Clear();
+            int sel = 0;
+            for (int i = 0; i < Conf.Profiles.Count; i++)
+            {
+                lbProfiles.Items.Add(Conf.Profiles[i].Name);
+                if (Conf.Profiles[i].Name == Conf.Active) sel = i;
+            }
+            if (lbProfiles.Items.Count > 0) lbProfiles.SelectedIndex = sel;
+        }
+
+        void EditSelectedProfile()
+        {
+            int idx = lbProfiles.SelectedIndex;
+            if (idx < 0 || idx >= Conf.Profiles.Count) return;
+            Profile p = Conf.Profiles[idx];
+            using (var f = new ProfileForm(p))
+            {
+                if (f.ShowDialog(this) == DialogResult.OK && f.Result != null)
+                {
+                    string oldName = p.Name;
+                    p.Name = f.Result.Name;
+                    p.DGw = f.Result.DGw; p.DDns = f.Result.DDns;
+                    p.OGw = f.Result.OGw; p.ODns = f.Result.ODns;
+                    if (Conf.Active == oldName) Conf.Active = p.Name;
+                    Conf.Save();
+                    FillProfiles();
+                }
+            }
+        }
+
+        void DeleteSelectedProfile()
+        {
+            int idx = lbProfiles.SelectedIndex;
+            if (idx < 0 || idx >= Conf.Profiles.Count) return;
+            if (Conf.Profiles.Count <= 1)
+            {
+                MessageBox.Show(L.KEEP_ONE, L.CANT_DELETE, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            Profile p = Conf.Profiles[idx];
+            var r = MessageBox.Show(string.Format(L.DEL_Q_FMT, p.Name), L.DLG_TITLE,
+                MessageBoxButtons.OKCancel, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2);
+            if (r != DialogResult.OK) return;
+            Conf.Profiles.Remove(p);
+            if (Conf.Active == p.Name) Conf.Active = Conf.Profiles[0].Name;
+            Conf.Save();
+            FillProfiles();
         }
 
         // Returns false (and keeps the dialog open) on invalid input.
@@ -1119,37 +1204,34 @@ namespace NetworkSwitch
             foreach (Profile p in Conf.Profiles)
             {
                 Profile prof = p;
+                // Flat layout (Fred, 2026-11-24): the Profile name is a
+                // greyed first-level header - not clickable, and nothing
+                // pops out of it. Its two exits are ordinary first-level
+                // items listed beneath it. Editing and deleting Profiles
+                // are configuration, so they live in Settings....
                 // Checkmarks follow the MEASURED gateway for this profile,
                 // never the saved ACTIVE name: on a foreign network (phone
                 // hotspot, DHCP after Restore Automatic, ...) nothing is
                 // checked unless the gateway really matches an exit.
                 string pMode = ModeFor(prof);
-                var item = new ToolStripMenuItem(prof.Name);
-                item.Checked = pMode != L.UNKNOWN;
+                var head = new ToolStripMenuItem(prof.Name);
+                head.Enabled = false;
+                menu.Items.Add(head);
                 // Proxy mode and gateway switching are mutually exclusive:
                 // with the proxy on, the connection borrows another
                 // device's Clash and the local gateway must stay as the
                 // LAN/hotspot gave it - pinning a profile gateway would
-                // contradict that, so both exits are greyed out. Edit and
-                // Delete stay available; they do not touch the network.
+                // contradict that, so both exits are greyed out.
                 var dItem = new ToolStripMenuItem(string.Format(L.EXIT_FMT, L.DIRECT, prof.DGw, prof.DDns));
                 dItem.Checked = pMode == L.DIRECT;
                 dItem.Enabled = !proxyOn;
                 dItem.Click += delegate { SwitchTo(prof, true); };
-                item.DropDownItems.Add(dItem);
+                menu.Items.Add(dItem);
                 var oItem = new ToolStripMenuItem(string.Format(L.EXIT_FMT, L.OVERSEAS, prof.OGw, prof.ODns));
                 oItem.Checked = pMode == L.OVERSEAS;
                 oItem.Enabled = !proxyOn;
                 oItem.Click += delegate { SwitchTo(prof, false); };
-                item.DropDownItems.Add(oItem);
-                item.DropDownItems.Add(new ToolStripSeparator());
-                var eItem = new ToolStripMenuItem(L.EDIT);
-                eItem.Click += delegate { EditProfile(prof); };
-                item.DropDownItems.Add(eItem);
-                var delItem = new ToolStripMenuItem(L.DEL);
-                delItem.Click += delegate { DeleteProfile(prof); };
-                item.DropDownItems.Add(delItem);
-                menu.Items.Add(item);
+                menu.Items.Add(oItem);
             }
 
             var proxyItem = new ToolStripMenuItem(L.PROXY);
@@ -1225,39 +1307,6 @@ namespace NetworkSwitch
                     Conf.Save();
                 }
             }
-            Rebuild();
-        }
-
-        void EditProfile(Profile p)
-        {
-            using (var f = new ProfileForm(p))
-            {
-                if (f.ShowDialog() == DialogResult.OK && f.Result != null)
-                {
-                    string oldName = p.Name;
-                    p.Name = f.Result.Name;
-                    p.DGw = f.Result.DGw; p.DDns = f.Result.DDns;
-                    p.OGw = f.Result.OGw; p.ODns = f.Result.ODns;
-                    if (Conf.Active == oldName) Conf.Active = p.Name;
-                    Conf.Save();
-                }
-            }
-            Rebuild();
-        }
-
-        void DeleteProfile(Profile p)
-        {
-            if (Conf.Profiles.Count <= 1)
-            {
-                MessageBox.Show(L.KEEP_ONE, L.CANT_DELETE, MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
-            var r = MessageBox.Show(string.Format(L.DEL_Q_FMT, p.Name), L.DLG_TITLE,
-                MessageBoxButtons.OKCancel, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2);
-            if (r != DialogResult.OK) return;
-            Conf.Profiles.Remove(p);
-            if (Conf.Active == p.Name) Conf.Active = Conf.Profiles[0].Name;
-            Conf.Save();
             Rebuild();
         }
 
