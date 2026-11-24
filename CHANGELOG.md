@@ -3,6 +3,10 @@
 All notable changes to Network Switch for Windows.
 本项目的重要变更都记在这里。
 
+## v1.2.5 — 2026-11-24
+
+- **Menu layout aligned with BingWallpaper / 菜单分组与 BingWallpaper 对齐**: the tray menu's last group is now always **Settings… / Check for Updates... / About… / Quit**, with the functional items in the groups above it — **Add Profile...** and **Restore Automatic (DHCP)** form their own group, followed by a separator. **Check for Updates...** is new as a menu item (it previously lived only inside the Settings dialog) and runs the same manual check; the stray separator that used to sit between About and Quit is gone. Same regrouping in the not-configured menu. / 托盘菜单的最后一组从此固定为 **设置… / 检查更新… / 关于… / 退出**，功能项都归到上面的组：**添加 Profile…** 与 **恢复自动（DHCP）** 自成一组，其后加分割线。**检查更新…** 新增为菜单项（此前只藏在设置对话框里），跑的是同一个手动检查；About 与 Quit 之间那条多余的分割线去掉。未配置状态下的菜单同样重新分组。
+
 ## v1.2.4 — 2026-11-24
 
 - **Unified About / 统一 About**: the About dialog's GitHub link now reads **GitHub Repository** — in v1.1.0–v1.2.3 the raw URL itself was the link text, which Fred called (rightly) crude. This dialog is the reference for the unified About rolled out to all our Windows and macOS programs in this round: name, version, Idea: Otakun, Coding: Dash, and a link labelled "GitHub Repository". No functional changes. / About 对话框里的 GitHub 链接现在显示为 **GitHub Repository**——v1.1.0–v1.2.3 里链接文字就是那串原始 URL，Fred 说它粗糙，说得对。这个对话框是本轮统一 About 的样板，推广到我们全部 Windows 与 macOS 程序：程序名、版本、Idea: Otakun、Coding: Dash、一条写着「GitHub Repository」的链接。无功能变化。

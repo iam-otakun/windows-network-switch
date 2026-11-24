@@ -90,7 +90,7 @@ using System.Windows.Forms;
 [assembly: System.Reflection.AssemblyDescription("Switch the active network connection between two gateways on the same LAN from the system tray. Windows counterpart of swiftbar-network-switch.")]
 [assembly: System.Reflection.AssemblyCompany("Otakun and Dash")]
 [assembly: System.Reflection.AssemblyProduct("Network Switch")]
-[assembly: System.Reflection.AssemblyVersion("1.2.4.0")]
+[assembly: System.Reflection.AssemblyVersion("1.2.5.0")]
 
 namespace NetworkSwitch
 {
@@ -1079,8 +1079,10 @@ namespace NetworkSwitch
                 menu.Items.Add(none);
                 menu.Items.Add(new ToolStripSeparator());
                 menu.Items.Add(MakeItem(L.ADD, delegate { AddProfile(); }));
+                menu.Items.Add(new ToolStripSeparator());
                 menu.Items.Add(MakeItem(L.SETTINGS + "…", delegate { ShowSettings(); }));
-                menu.Items.Add(MakeItem(L.ABOUT, delegate { ShowAbout(); }));
+                menu.Items.Add(MakeItem(L.CHECK_UPDATE, delegate { ManualUpdateCheck(); }));
+                menu.Items.Add(MakeItem(L.ABOUT + "…", delegate { ShowAbout(); }));
                 menu.Items.Add(MakeItem(L.QUIT, delegate { Quit(); }));
                 return;
             }
@@ -1166,9 +1168,10 @@ namespace NetworkSwitch
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add(MakeItem(L.ADD, delegate { AddProfile(); }));
             menu.Items.Add(MakeItem(L.DHCP, delegate { RestoreDhcp(); }));
-            menu.Items.Add(MakeItem(L.SETTINGS + "…", delegate { ShowSettings(); }));
-            menu.Items.Add(MakeItem(L.ABOUT, delegate { ShowAbout(); }));
             menu.Items.Add(new ToolStripSeparator());
+            menu.Items.Add(MakeItem(L.SETTINGS + "…", delegate { ShowSettings(); }));
+            menu.Items.Add(MakeItem(L.CHECK_UPDATE, delegate { ManualUpdateCheck(); }));
+            menu.Items.Add(MakeItem(L.ABOUT + "…", delegate { ShowAbout(); }));
             menu.Items.Add(MakeItem(L.QUIT, delegate { Quit(); }));
         }
 
