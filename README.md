@@ -4,6 +4,10 @@ A tiny Windows system-tray app that switches the active network connection betwe
 
 一个小巧的 Windows 托盘程序：在系统托盘一键切换当前连接的**同网段双网关**。不同地点存为 **Profile**——同一台笔记本带回家、带到办公室，每个地方有自己的一对网关。它是 macOS SwiftBar 插件 [swiftbar-network-switch](https://github.com/iam-otakun/swiftbar-network-switch) 的 Windows 对应版，两个版本**共用同一份配置文件格式**。
 
+<p align="center">
+  <img width="414" alt="screenshot" src="screenshot.png">
+</p>
+
 ## About this app / 关于这个应用
 
 Built by **Otakun** (idea) together with **Dash**, his Muse assistant (coding), for a specific daily routine: the same laptop moving between home and office, where each LAN has two gateways — one direct, one via a bypass router. It is the Windows edition of our own macOS plugin, built because we needed it every day, and shared in case your network looks the same.
