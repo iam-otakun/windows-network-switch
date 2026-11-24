@@ -1,4 +1,8 @@
-// 网络切换 / Network Switch (Windows tray edition) v1.2.3
+// 网络切换 / Network Switch (Windows tray edition) v1.2.4
+// v1.2.4: the About dialog's GitHub link now reads "GitHub Repository"
+// (in v1.1.0-v1.2.3 the raw URL was the link text) - the reference step
+// of the unified About rolled out to all our Windows and macOS
+// programs in this round.
 // v1.2.3: the mutual exclusion is symmetric - while the measured
 // gateway matches a profile exit (profile mode), the Proxy item is
 // greyed out too; it stays clickable while the proxy is on (to switch
@@ -86,7 +90,7 @@ using System.Windows.Forms;
 [assembly: System.Reflection.AssemblyDescription("Switch the active network connection between two gateways on the same LAN from the system tray. Windows counterpart of swiftbar-network-switch.")]
 [assembly: System.Reflection.AssemblyCompany("Otakun and Dash")]
 [assembly: System.Reflection.AssemblyProduct("Network Switch")]
-[assembly: System.Reflection.AssemblyVersion("1.2.3.0")]
+[assembly: System.Reflection.AssemblyVersion("1.2.4.0")]
 
 namespace NetworkSwitch
 {
@@ -898,7 +902,7 @@ namespace NetworkSwitch
             Controls.Add(coding);
 
             var link = new LinkLabel();
-            link.Text = "github.com/iam-otakun/windows-network-switch";
+            link.Text = "GitHub Repository";
             link.Location = new Point(16, 128);
             link.Size = new Size(308, 18);
             link.LinkClicked += delegate { Process.Start("https://github.com/iam-otakun/windows-network-switch"); };
