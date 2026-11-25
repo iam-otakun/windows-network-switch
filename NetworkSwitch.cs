@@ -1,4 +1,20 @@
-// 网络切换 / Network Switch (Windows tray edition) v1.2.4
+// 网络切换 / Network Switch (Windows tray edition) v1.3.0
+// v1.3.0: traffic mini window (Fred's idea, modelled on the Huorong
+// Netflux widget he used to use): a small translucent always-on-top
+// window sits directly above our own tray icon and follows it,
+// showing live total upload/download rates (adapter counters, sampled
+// every second). Clicking it opens a summary popup (totals + the
+// processes holding the most connections); the popup's Details link
+// opens a full window listing every process with its TCP/UDP
+// connections and endpoints. Right-clicking the mini window offers
+// Always on top / Auto-hide when docked to screen edge / Auto-hide in
+// fullscreen mode / View details / Close. Per-process byte rates are
+// NOT shown: on Windows those need a kernel driver (that is how
+// Huorong does it); user-mode APIs only expose per-process
+// connections, so the popup and Details show connection counts
+// instead. The whole feature can be switched off in Settings
+// (APP|TRAFFICWIN), and its right-click toggles persist as
+// APP|TRAFFIC_ONTOP / TRAFFIC_HIDEEDGE / TRAFFIC_HIDEFS.
 // v1.2.4: the About dialog's GitHub link now reads "GitHub Repository"
 // (in v1.1.0-v1.2.3 the raw URL was the link text) - the reference step
 // of the unified About rolled out to all our Windows and macOS
@@ -92,7 +108,7 @@ using System.Windows.Forms;
 [assembly: System.Reflection.AssemblyDescription("Switch the active network connection between two gateways on the same LAN from the system tray. Windows counterpart of swiftbar-network-switch.")]
 [assembly: System.Reflection.AssemblyCompany("Otakun and Dash")]
 [assembly: System.Reflection.AssemblyProduct("Network Switch")]
-[assembly: System.Reflection.AssemblyVersion("1.2.6.0")]
+[assembly: System.Reflection.AssemblyVersion("1.3.0.0")]
 
 namespace NetworkSwitch
 {
@@ -114,6 +130,9 @@ namespace NetworkSwitch
         public static string SWITCH_FAIL, NO_IP_FMT, SWITCH_CANCELLED, SWITCH_ERR_FMT;
         public static string NOT_SAVED, NOT_ADDED, CANT_DELETE;
         public static string BAD_IP, NAME_EMPTY, NAME_PIPE, NAME_EXISTS_FMT, KEEP_ONE, DEL_Q_FMT;
+        public static string TRAFFIC_TXT, ONTOP_TXT, HIDEEDGE_TXT, HIDEFS_TXT, VIEW_DETAILS, CLOSE_TRAFFIC;
+        public static string DETAILS_TITLE, COL_APP, COL_TYPE, COL_CONN, COL_PROTO, COL_LOCAL, COL_REMOTE, COL_STATE;
+        public static string SYS_TYPE, THIRD_TYPE, TOTAL_FMT, ACTIVE_CONN;
 
         static L()
         {
@@ -160,6 +179,15 @@ namespace NetworkSwitch
                 NAME_EXISTS_FMT = "已经有一个叫「{0}」的 Profile 了。";
                 KEEP_ONE = "至少要保留一个 Profile。";
                 DEL_Q_FMT = "删除 Profile「{0}」？";
+                TRAFFIC_TXT = "显示网速小窗"; ONTOP_TXT = "始终置顶";
+                HIDEEDGE_TXT = "靠近屏幕边缘时自动隐藏"; HIDEFS_TXT = "全屏时自动隐藏";
+                VIEW_DETAILS = "查看详情"; CLOSE_TRAFFIC = "关闭网速小窗";
+                DETAILS_TITLE = "网络流量详情";
+                COL_APP = "应用程序"; COL_TYPE = "类型"; COL_CONN = "连接数";
+                COL_PROTO = "协议"; COL_LOCAL = "本地地址"; COL_REMOTE = "远程地址"; COL_STATE = "状态";
+                SYS_TYPE = "系统"; THIRD_TYPE = "第三方";
+                TOTAL_FMT = "总下载速度：↓ {0}    总上传速度：↑ {1}";
+                ACTIVE_CONN = "活动连接";
             }
             else
             {
@@ -201,6 +229,15 @@ namespace NetworkSwitch
                 NAME_EXISTS_FMT = "A Profile named {0} already exists.";
                 KEEP_ONE = "At least one Profile must remain.";
                 DEL_Q_FMT = "Delete the Profile {0}?";
+                TRAFFIC_TXT = "Show traffic mini window"; ONTOP_TXT = "Always on top";
+                HIDEEDGE_TXT = "Auto-hide when dock to screen edge"; HIDEFS_TXT = "Auto-hide in fullscreen mode";
+                VIEW_DETAILS = "View details"; CLOSE_TRAFFIC = "Close network statistics window";
+                DETAILS_TITLE = "Network Traffic Details";
+                COL_APP = "Application"; COL_TYPE = "Type"; COL_CONN = "Connections";
+                COL_PROTO = "Protocol"; COL_LOCAL = "Local Address"; COL_REMOTE = "Remote Address"; COL_STATE = "State";
+                SYS_TYPE = "System"; THIRD_TYPE = "Third-Party";
+                TOTAL_FMT = "Total download speed: {0}    Total upload speed: {1}";
+                ACTIVE_CONN = "Active connections";
             }
         }
     }
@@ -222,6 +259,10 @@ namespace NetworkSwitch
         public static string LastCheck = "";
         public static string ProxyIp = "172.20.10.1";
         public static string ProxyPort = "7890";
+        public static bool TrafficWin = true;
+        public static bool TrafficOnTop = true;
+        public static bool TrafficHideEdge = false;
+        public static bool TrafficHideFs = true;
 
         public static void Load()
         {
@@ -229,6 +270,7 @@ namespace NetworkSwitch
             Active = "";
             AutoStart = false; AutoUpdate = true; LastCheck = "";
             ProxyIp = "172.20.10.1"; ProxyPort = "7890";
+            TrafficWin = true; TrafficOnTop = true; TrafficHideEdge = false; TrafficHideFs = true;
             if (!File.Exists(Path)) return;
             var map = new Dictionary<string, Profile>();
             var order = new List<string>();
@@ -249,6 +291,10 @@ namespace NetworkSwitch
                         else if (ap[1] == "LASTCHECK") LastCheck = ap[2];
                         else if (ap[1] == "PROXY_IP") ProxyIp = ap[2];
                         else if (ap[1] == "PROXY_PORT") ProxyPort = ap[2];
+                        else if (ap[1] == "TRAFFICWIN") TrafficWin = ap[2] == "1";
+                        else if (ap[1] == "TRAFFIC_ONTOP") TrafficOnTop = ap[2] == "1";
+                        else if (ap[1] == "TRAFFIC_HIDEEDGE") TrafficHideEdge = ap[2] == "1";
+                        else if (ap[1] == "TRAFFIC_HIDEFS") TrafficHideFs = ap[2] == "1";
                     }
                 }
                 else if (line.StartsWith("PROFILE|"))
@@ -282,6 +328,10 @@ namespace NetworkSwitch
             lines.Add("APP|AUTOUPDATE|" + (AutoUpdate ? "1" : "0"));
             lines.Add("APP|PROXY_IP|" + ProxyIp);
             lines.Add("APP|PROXY_PORT|" + ProxyPort);
+            lines.Add("APP|TRAFFICWIN|" + (TrafficWin ? "1" : "0"));
+            lines.Add("APP|TRAFFIC_ONTOP|" + (TrafficOnTop ? "1" : "0"));
+            lines.Add("APP|TRAFFIC_HIDEEDGE|" + (TrafficHideEdge ? "1" : "0"));
+            lines.Add("APP|TRAFFIC_HIDEFS|" + (TrafficHideFs ? "1" : "0"));
             if (LastCheck.Length > 0) lines.Add("APP|LASTCHECK|" + LastCheck);
             foreach (Profile p in Profiles)
             {
@@ -579,6 +629,333 @@ namespace NetworkSwitch
         }
     }
 
+    // ---------------- traffic sampling (adapter totals) ----------------
+    // Total machine throughput from the adapters' own byte counters.
+    // Per-process byte rates are not available from user-mode Windows
+    // APIs (they need a kernel driver), so processes are reported with
+    // connection counts instead - see ProcNet below.
+    static class Traffic
+    {
+        public static long UpRate;   // bytes per second
+        public static long DownRate; // bytes per second
+        static long lastSent, lastRecv;
+        static DateTime lastAt = DateTime.MinValue;
+        static bool haveLast;
+
+        public static void Sample()
+        {
+            long sent = 0, recv = 0;
+            try
+            {
+                foreach (NetworkInterface ni in NetworkInterface.GetAllNetworkInterfaces())
+                {
+                    if (ni.OperationalStatus != OperationalStatus.Up) continue;
+                    if (ni.NetworkInterfaceType == NetworkInterfaceType.Loopback) continue;
+                    IPv4InterfaceStatistics s;
+                    try { s = ni.GetIPv4Statistics(); } catch { continue; }
+                    if (s == null) continue;
+                    sent += s.BytesSent;
+                    recv += s.BytesReceived;
+                }
+            }
+            catch { return; }
+            DateTime now = DateTime.Now;
+            if (haveLast)
+            {
+                double dt = (now - lastAt).TotalSeconds;
+                if (dt > 0.2)
+                {
+                    long ds = sent - lastSent, dr = recv - lastRecv;
+                    UpRate = ds > 0 ? (long)(ds / dt) : 0;
+                    DownRate = dr > 0 ? (long)(dr / dt) : 0;
+                }
+            }
+            lastSent = sent; lastRecv = recv; lastAt = now; haveLast = true;
+        }
+
+        public static string Format(long bytesPerSec)
+        {
+            if (bytesPerSec < 1024) return bytesPerSec + " B/s";
+            if (bytesPerSec < 1024 * 1024) return (bytesPerSec / 1024.0).ToString("0.0") + " KB/s";
+            return (bytesPerSec / 1048576.0).ToString("0.00") + " MB/s";
+        }
+    }
+
+    // ---------------- tray icon location ----------------
+    // The mini window must sit directly above OUR tray icon and follow
+    // it. Shell_NotifyIconGetRect answers that for an icon identified
+    // by (window handle, uID); WinForms keeps both in private fields of
+    // NotifyIcon, read here by reflection (same trick the tray menu
+    // already uses for ShowContextMenu). If that fails, fall back to
+    // the notification area's own rectangle (icons live left of the
+    // clock), which is still "above the tray icons".
+    static class TrayLocator
+    {
+        [StructLayout(LayoutKind.Sequential)]
+        struct RECT { public int Left, Top, Right, Bottom; }
+
+        [StructLayout(LayoutKind.Sequential)]
+        struct NOTIFYICONIDENTIFIER
+        {
+            public int cbSize;
+            public IntPtr hWnd;
+            public uint uID;
+            public Guid guidItem;
+        }
+
+        [DllImport("shell32.dll")]
+        static extern int Shell_NotifyIconGetRect(ref NOTIFYICONIDENTIFIER id, out RECT rect);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        static extern IntPtr FindWindow(string cls, string win);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        static extern IntPtr FindWindowEx(IntPtr parent, IntPtr after, string cls, string win);
+
+        [DllImport("user32.dll")]
+        static extern bool GetWindowRect(IntPtr hwnd, out RECT rect);
+
+        public static bool TryIconRect(NotifyIcon icon, out Rectangle result)
+        {
+            result = Rectangle.Empty;
+            try
+            {
+                var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+                var winField = typeof(NotifyIcon).GetField("window", flags);
+                if (winField == null) return false;
+                var native = winField.GetValue(icon) as NativeWindow;
+                if (native == null || native.Handle == IntPtr.Zero) return false;
+                uint uid = 1;
+                var idField = typeof(NotifyIcon).GetField("id", flags);
+                if (idField != null)
+                {
+                    object v = idField.GetValue(icon);
+                    if (v is int && (int)v > 0) uid = (uint)(int)v;
+                }
+                for (uint cand = uid; cand <= uid + 3; cand++)
+                {
+                    var id = new NOTIFYICONIDENTIFIER();
+                    id.cbSize = Marshal.SizeOf(typeof(NOTIFYICONIDENTIFIER));
+                    id.hWnd = native.Handle;
+                    id.uID = cand;
+                    id.guidItem = Guid.Empty;
+                    RECT r;
+                    if (Shell_NotifyIconGetRect(ref id, out r) == 0 && r.Right > r.Left && r.Bottom > r.Top)
+                    {
+                        result = Rectangle.FromLTRB(r.Left, r.Top, r.Right, r.Bottom);
+                        return true;
+                    }
+                }
+            }
+            catch { }
+            return false;
+        }
+
+        public static bool TryTrayAreaRect(out Rectangle result)
+        {
+            result = Rectangle.Empty;
+            try
+            {
+                IntPtr tray = FindWindow("Shell_TrayWnd", null);
+                if (tray == IntPtr.Zero) return false;
+                IntPtr notify = FindWindowEx(tray, IntPtr.Zero, "TrayNotifyWnd", null);
+                if (notify == IntPtr.Zero) return false;
+                RECT r;
+                if (!GetWindowRect(notify, out r)) return false;
+                int right = r.Right;
+                IntPtr clock = FindWindowEx(notify, IntPtr.Zero, "TrayClockWClass", null);
+                if (clock != IntPtr.Zero)
+                {
+                    RECT cr;
+                    if (GetWindowRect(clock, out cr) && cr.Left > r.Left) right = cr.Left;
+                }
+                result = Rectangle.FromLTRB(r.Left, r.Top, right, r.Bottom);
+                return result.Width > 10 && result.Height > 5;
+            }
+            catch { return false; }
+        }
+    }
+
+    // ---------------- per-process connections ----------------
+    class ProcConn
+    {
+        public int Pid;
+        public string Name = "";
+        public string Path = "";
+        public bool IsSystem;
+        // Each endpoint: { protocol, local, remote, state }
+        public List<string[]> Endpoints = new List<string[]>();
+        public int Count { get { return Endpoints.Count; } }
+    }
+
+    static class ProcNet
+    {
+        const int AF_INET = 2;
+
+        [DllImport("iphlpapi.dll", SetLastError = true)]
+        static extern uint GetExtendedTcpTable(IntPtr table, ref int size, bool order, int ipVersion, int tableClass, uint reserved);
+
+        [DllImport("iphlpapi.dll", SetLastError = true)]
+        static extern uint GetExtendedUdpTable(IntPtr table, ref int size, bool order, int ipVersion, int tableClass, uint reserved);
+
+        [StructLayout(LayoutKind.Sequential)]
+        struct TcpRow
+        {
+            public uint State, LocalAddr, LocalPort, RemoteAddr, RemotePort, Pid;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        struct UdpRow
+        {
+            public uint LocalAddr, LocalPort, Pid;
+        }
+
+        static string Ip(uint v)
+        {
+            return new IPAddress(BitConverter.GetBytes(v)).ToString();
+        }
+
+        static int Port(uint v)
+        {
+            return (int)(((v & 0xFF) << 8) | ((v >> 8) & 0xFF));
+        }
+
+        static readonly string[] StateNames =
+        {
+            "", "Closed", "Listening", "SYN Sent", "SYN Received", "Established",
+            "FIN Wait 1", "FIN Wait 2", "Close Wait", "Closing", "Last ACK",
+            "Time Wait", "Delete TCB"
+        };
+
+        static ProcConn ForPid(Dictionary<int, ProcConn> map, int pid)
+        {
+            ProcConn pc;
+            if (!map.TryGetValue(pid, out pc))
+            {
+                pc = new ProcConn();
+                pc.Pid = pid;
+                map[pid] = pc;
+            }
+            return pc;
+        }
+
+        public static List<ProcConn> Collect()
+        {
+            var map = new Dictionary<int, ProcConn>();
+            // TCP (TCP_TABLE_OWNER_PID_ALL = 5)
+            int size = 0;
+            GetExtendedTcpTable(IntPtr.Zero, ref size, true, AF_INET, 5, 0);
+            if (size > 0)
+            {
+                IntPtr buf = Marshal.AllocHGlobal(size);
+                try
+                {
+                    if (GetExtendedTcpTable(buf, ref size, true, AF_INET, 5, 0) == 0)
+                    {
+                        int n = Marshal.ReadInt32(buf);
+                        int rowSize = Marshal.SizeOf(typeof(TcpRow));
+                        for (int i = 0; i < n; i++)
+                        {
+                            var row = (TcpRow)Marshal.PtrToStructure(
+                                new IntPtr(buf.ToInt64() + 4 + (long)i * rowSize), typeof(TcpRow));
+                            string state = row.State < (uint)StateNames.Length ? StateNames[row.State] : "";
+                            ForPid(map, (int)row.Pid).Endpoints.Add(new string[]
+                            {
+                                "TCP",
+                                Ip(row.LocalAddr) + ":" + Port(row.LocalPort),
+                                Ip(row.RemoteAddr) + ":" + Port(row.RemotePort),
+                                state
+                            });
+                        }
+                    }
+                }
+                catch { }
+                finally { Marshal.FreeHGlobal(buf); }
+            }
+            // UDP (UDP_TABLE_OWNER_PID = 1)
+            size = 0;
+            GetExtendedUdpTable(IntPtr.Zero, ref size, true, AF_INET, 1, 0);
+            if (size > 0)
+            {
+                IntPtr buf = Marshal.AllocHGlobal(size);
+                try
+                {
+                    if (GetExtendedUdpTable(buf, ref size, true, AF_INET, 1, 0) == 0)
+                    {
+                        int n = Marshal.ReadInt32(buf);
+                        int rowSize = Marshal.SizeOf(typeof(UdpRow));
+                        for (int i = 0; i < n; i++)
+                        {
+                            var row = (UdpRow)Marshal.PtrToStructure(
+                                new IntPtr(buf.ToInt64() + 4 + (long)i * rowSize), typeof(UdpRow));
+                            ForPid(map, (int)row.Pid).Endpoints.Add(new string[]
+                            {
+                                "UDP",
+                                Ip(row.LocalAddr) + ":" + Port(row.LocalPort),
+                                "*:*",
+                                ""
+                            });
+                        }
+                    }
+                }
+                catch { }
+                finally { Marshal.FreeHGlobal(buf); }
+            }
+            var list = new List<ProcConn>();
+            foreach (ProcConn pc in map.Values)
+            {
+                Resolve(pc);
+                list.Add(pc);
+            }
+            list.Sort(delegate(ProcConn a, ProcConn b) { return b.Count.CompareTo(a.Count); });
+            return list;
+        }
+
+        static readonly string[] SystemNames =
+        {
+            "svchost", "lsass", "csrss", "smss", "wininit", "winlogon", "services",
+            "spoolsv", "dwm", "MsMpEng", "NisSrv", "SecurityHealthService",
+            "fontdrvhost", "WmiPrvSE", "SearchIndexer", "SystemSettings"
+        };
+
+        static void Resolve(ProcConn pc)
+        {
+            if (pc.Pid == 0) { pc.Name = "Idle"; pc.IsSystem = true; return; }
+            if (pc.Pid == 4) { pc.Name = "System"; pc.IsSystem = true; return; }
+            try
+            {
+                var p = Process.GetProcessById(pc.Pid);
+                pc.Name = p.ProcessName;
+                try { pc.Path = p.MainModule.FileName; } catch { pc.Path = ""; }
+            }
+            catch
+            {
+                pc.Name = "PID " + pc.Pid;
+                pc.Path = "";
+            }
+            string winDir = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
+            if (pc.Path.Length > 0 && winDir.Length > 0 &&
+                pc.Path.StartsWith(winDir, StringComparison.OrdinalIgnoreCase))
+            {
+                pc.IsSystem = true;
+                return;
+            }
+            if (pc.Path.Length == 0)
+            {
+                foreach (string s in SystemNames)
+                    if (string.Equals(pc.Name, s, StringComparison.OrdinalIgnoreCase)) { pc.IsSystem = true; return; }
+            }
+            pc.IsSystem = false;
+        }
+
+        // Small icon for a process path, cached by the forms.
+        public static Icon IconFor(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return null;
+            try { return Icon.ExtractAssociatedIcon(path); } catch { return null; }
+        }
+    }
+
     class ReleaseInfo
     {
         public Version Version;
@@ -769,7 +1146,7 @@ namespace NetworkSwitch
     // ---------------- settings dialog ----------------
     class SettingsForm : Form
     {
-        CheckBox cbAutoStart, cbAutoUpdate;
+        CheckBox cbAutoStart, cbAutoUpdate, cbTraffic;
         TextBox tbProxyIp, tbProxyPort;
         ListBox lbProfiles;
         public bool CheckRequested = false;
@@ -780,7 +1157,7 @@ namespace NetworkSwitch
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false; MinimizeBox = false;
             StartPosition = FormStartPosition.CenterScreen;
-            ClientSize = new Size(360, 350);
+            ClientSize = new Size(360, 378);
             Font = new Font("Microsoft YaHei UI", 9f);
 
             cbAutoStart = new CheckBox();
@@ -797,31 +1174,38 @@ namespace NetworkSwitch
             cbAutoUpdate.Checked = Conf.AutoUpdate;
             Controls.Add(cbAutoUpdate);
 
-            tbProxyIp = AddRow(L.PROXY_IP, 76, Conf.ProxyIp);
-            tbProxyPort = AddRow(L.PROXY_PORT, 106, Conf.ProxyPort);
+            cbTraffic = new CheckBox();
+            cbTraffic.Text = L.TRAFFIC_TXT;
+            cbTraffic.Location = new Point(16, 70);
+            cbTraffic.Size = new Size(328, 22);
+            cbTraffic.Checked = Conf.TrafficWin;
+            Controls.Add(cbTraffic);
+
+            tbProxyIp = AddRow(L.PROXY_IP, 104, Conf.ProxyIp);
+            tbProxyPort = AddRow(L.PROXY_PORT, 134, Conf.ProxyPort);
 
             var lblProfiles = new Label();
             lblProfiles.Text = L.PROFILES_LABEL;
-            lblProfiles.Location = new Point(16, 142);
+            lblProfiles.Location = new Point(16, 170);
             lblProfiles.Size = new Size(200, 18);
             Controls.Add(lblProfiles);
 
             lbProfiles = new ListBox();
-            lbProfiles.Location = new Point(16, 164);
+            lbProfiles.Location = new Point(16, 192);
             lbProfiles.Size = new Size(216, 82);
             lbProfiles.DoubleClick += delegate { EditSelectedProfile(); };
             Controls.Add(lbProfiles);
 
             var btnEditP = new Button();
             btnEditP.Text = L.EDIT_BTN;
-            btnEditP.Location = new Point(240, 164);
+            btnEditP.Location = new Point(240, 192);
             btnEditP.Size = new Size(104, 28);
             btnEditP.Click += delegate { EditSelectedProfile(); };
             Controls.Add(btnEditP);
 
             var btnDelP = new Button();
             btnDelP.Text = L.DELETE_BTN;
-            btnDelP.Location = new Point(240, 198);
+            btnDelP.Location = new Point(240, 226);
             btnDelP.Size = new Size(104, 28);
             btnDelP.Click += delegate { DeleteSelectedProfile(); };
             Controls.Add(btnDelP);
@@ -830,21 +1214,21 @@ namespace NetworkSwitch
 
             var btnCheck = new Button();
             btnCheck.Text = L.CHECK_UPDATE;
-            btnCheck.Location = new Point(16, 262);
+            btnCheck.Location = new Point(16, 290);
             btnCheck.Size = new Size(140, 28);
             btnCheck.Click += delegate { if (!SaveSettings()) return; CheckRequested = true; DialogResult = DialogResult.OK; Close(); };
             Controls.Add(btnCheck);
 
             var btnOk = new Button();
             btnOk.Text = L.SAVE;
-            btnOk.Location = new Point(176, 306);
+            btnOk.Location = new Point(176, 334);
             btnOk.Size = new Size(80, 28);
             btnOk.Click += delegate { if (!SaveSettings()) return; DialogResult = DialogResult.OK; Close(); };
             Controls.Add(btnOk);
 
             var btnCancel = new Button();
             btnCancel.Text = L.CANCEL;
-            btnCancel.Location = new Point(264, 306);
+            btnCancel.Location = new Point(264, 334);
             btnCancel.Size = new Size(80, 28);
             btnCancel.DialogResult = DialogResult.Cancel;
             Controls.Add(btnCancel);
@@ -940,6 +1324,7 @@ namespace NetworkSwitch
             bool wasOn = ProxyCtl.IsOn();
             Conf.AutoStart = cbAutoStart.Checked;
             Conf.AutoUpdate = cbAutoUpdate.Checked;
+            Conf.TrafficWin = cbTraffic.Checked;
             Conf.ProxyIp = ip;
             Conf.ProxyPort = port;
             Conf.Save();
@@ -1004,12 +1389,491 @@ namespace NetworkSwitch
         }
     }
 
+    // ---------------- traffic window icons ----------------
+    static class IconHelper
+    {
+        public static int IndexFor(ImageList imgs, Dictionary<string, int> cache, ProcConn pc)
+        {
+            string key = pc.Path.Length > 0 ? pc.Path : ("pid:" + pc.Pid);
+            int idx;
+            if (cache.TryGetValue(key, out idx)) return idx;
+            idx = -1;
+            Icon ic = ProcNet.IconFor(pc.Path);
+            if (ic != null)
+            {
+                imgs.Images.Add(key, ic);
+                idx = imgs.Images.Count - 1;
+            }
+            cache[key] = idx;
+            return idx;
+        }
+    }
+
+    // ---------------- traffic mini window ----------------
+    // The small translucent window that hovers directly above our tray
+    // icon. Left-click toggles the summary popup; right-click offers
+    // the Huorong-style toggles (always on top / auto-hide at the
+    // screen edge / auto-hide in fullscreen / view details / close).
+    class TrafficMiniForm : Form
+    {
+        const int WinW = 124;
+        const int ExpandedH = 46;
+        const int CollapsedH = 6;
+
+        [DllImport("shell32.dll")]
+        static extern int SHQueryUserNotificationState(out int state);
+
+        NotifyIcon trayIcon;
+        Label upArrow, upVal, downArrow, downVal;
+        System.Windows.Forms.Timer tick;
+        TrafficPopupForm popup;
+        TrafficDetailsForm details;
+        ToolStripMenuItem miOnTop, miHideEdge, miHideFs;
+        bool fsHidden;
+        bool collapsedNow;
+        string lastUp = "", lastDown = "";
+
+        public TrafficMiniForm(NotifyIcon icon)
+        {
+            trayIcon = icon;
+            FormBorderStyle = FormBorderStyle.None;
+            ShowInTaskbar = false;
+            TopMost = Conf.TrafficOnTop;
+            StartPosition = FormStartPosition.Manual;
+            Size = new Size(WinW, ExpandedH);
+            Location = new Point(-2000, -2000);
+            BackColor = Color.FromArgb(24, 24, 24);
+            Opacity = 0.88;
+            Font = new Font("Microsoft YaHei UI", 9f);
+
+            upArrow = MkLabel("↑", 8, 4, Color.FromArgb(255, 140, 0));
+            upVal = MkLabel("0 B/s", 26, 4, Color.White);
+            downArrow = MkLabel("↓", 8, 25, Color.FromArgb(60, 200, 90));
+            downVal = MkLabel("0 B/s", 26, 25, Color.White);
+
+            var menu = new ContextMenuStrip();
+            miOnTop = new ToolStripMenuItem(L.ONTOP_TXT);
+            miOnTop.Click += delegate
+            {
+                Conf.TrafficOnTop = !Conf.TrafficOnTop;
+                TopMost = Conf.TrafficOnTop;
+                Conf.Save();
+            };
+            miHideEdge = new ToolStripMenuItem(L.HIDEEDGE_TXT);
+            miHideEdge.Click += delegate
+            {
+                Conf.TrafficHideEdge = !Conf.TrafficHideEdge;
+                Conf.Save();
+            };
+            miHideFs = new ToolStripMenuItem(L.HIDEFS_TXT);
+            miHideFs.Click += delegate
+            {
+                Conf.TrafficHideFs = !Conf.TrafficHideFs;
+                Conf.Save();
+            };
+            var miDetails = new ToolStripMenuItem(L.VIEW_DETAILS);
+            miDetails.Click += delegate { OpenDetails(); };
+            var miClose = new ToolStripMenuItem(L.CLOSE_TRAFFIC);
+            miClose.Click += delegate
+            {
+                Conf.TrafficWin = false;
+                Conf.Save();
+                ClosePopup();
+                Hide();
+            };
+            menu.Items.Add(miOnTop);
+            menu.Items.Add(miHideEdge);
+            menu.Items.Add(miHideFs);
+            menu.Items.Add(new ToolStripSeparator());
+            menu.Items.Add(miDetails);
+            menu.Items.Add(miClose);
+            menu.Opening += delegate
+            {
+                miOnTop.Checked = Conf.TrafficOnTop;
+                miHideEdge.Checked = Conf.TrafficHideEdge;
+                miHideFs.Checked = Conf.TrafficHideFs;
+            };
+            ContextMenuStrip = menu;
+            foreach (Control c in Controls) c.ContextMenuStrip = menu;
+
+            tick = new System.Windows.Forms.Timer();
+            tick.Interval = 1000;
+            tick.Tick += delegate { OnTick(); };
+            tick.Start();
+        }
+
+        Label MkLabel(string text, int x, int y, Color color)
+        {
+            var lbl = new Label();
+            lbl.Text = text;
+            lbl.AutoSize = true;
+            lbl.Location = new Point(x, y);
+            lbl.ForeColor = color;
+            lbl.BackColor = Color.Transparent;
+            lbl.MouseClick += new MouseEventHandler(OnMouseClick);
+            Controls.Add(lbl);
+            return lbl;
+        }
+
+        protected override CreateParams CreateParams
+        {
+            get
+            {
+                var cp = base.CreateParams;
+                cp.ExStyle |= 0x08000000; // WS_EX_NOACTIVATE
+                cp.ExStyle |= 0x00000080; // WS_EX_TOOLWINDOW
+                return cp;
+            }
+        }
+
+        protected override bool ShowWithoutActivation
+        {
+            get { return true; }
+        }
+
+        void OnMouseClick(object sender, MouseEventArgs e)
+        {
+            if (e.Button == MouseButtons.Left) TogglePopup();
+        }
+
+        protected override void OnMouseClick(MouseEventArgs e)
+        {
+            base.OnMouseClick(e);
+            if (e.Button == MouseButtons.Left) TogglePopup();
+        }
+
+        static bool FullscreenActive()
+        {
+            try
+            {
+                int state;
+                if (SHQueryUserNotificationState(out state) != 0) return false;
+                return state == 3 || state == 4; // QUNS_RUNNING_D3D_FULL_SCREEN / QUNS_PRESENTATION_MODE
+            }
+            catch { return false; }
+        }
+
+        Rectangle AnchorRect()
+        {
+            Rectangle r;
+            if (TrayLocator.TryIconRect(trayIcon, out r)) return r;
+            if (TrayLocator.TryTrayAreaRect(out r)) return r;
+            return Rectangle.Empty;
+        }
+
+        Rectangle ComputeRect(Rectangle anchor, Rectangle wa, bool below, int height)
+        {
+            int x = anchor.IsEmpty ? wa.Right - WinW - 6 : anchor.Left + anchor.Width / 2 - WinW / 2;
+            if (x < wa.Left) x = wa.Left;
+            if (x + WinW > wa.Right) x = wa.Right - WinW;
+            int y;
+            if (anchor.IsEmpty) y = wa.Bottom - height;
+            else if (below) y = anchor.Bottom + 2;
+            else y = anchor.Top - height - 2;
+            return new Rectangle(x, y, WinW, height);
+        }
+
+        void OnTick()
+        {
+            Traffic.Sample();
+            string u = Traffic.Format(Traffic.UpRate);
+            string d = Traffic.Format(Traffic.DownRate);
+            if (u != lastUp) { upVal.Text = u; lastUp = u; }
+            if (d != lastDown) { downVal.Text = d; lastDown = d; }
+
+            fsHidden = Conf.TrafficHideFs && FullscreenActive();
+            bool shouldShow = Conf.TrafficWin && !fsHidden;
+            if (!shouldShow)
+            {
+                if (Visible) Hide();
+                ClosePopup();
+                return;
+            }
+
+            Rectangle anchor = AnchorRect();
+            Screen scr = anchor.IsEmpty
+                ? Screen.PrimaryScreen
+                : Screen.FromPoint(new Point(anchor.Left + anchor.Width / 2, anchor.Top + anchor.Height / 2));
+            Rectangle wa = scr.WorkingArea;
+            bool below = !anchor.IsEmpty && (anchor.Top + anchor.Height / 2) < scr.Bounds.Height / 2;
+
+            collapsedNow = false;
+            if (Conf.TrafficHideEdge)
+            {
+                Rectangle exp = ComputeRect(anchor, wa, below, ExpandedH);
+                collapsedNow = !exp.Contains(Cursor.Position);
+            }
+            Rectangle target = ComputeRect(anchor, wa, below, collapsedNow ? CollapsedH : ExpandedH);
+            if (Bounds != target) Bounds = target;
+            bool labelsVisible = !collapsedNow;
+            if (upVal.Visible != labelsVisible)
+            {
+                upArrow.Visible = labelsVisible;
+                upVal.Visible = labelsVisible;
+                downArrow.Visible = labelsVisible;
+                downVal.Visible = labelsVisible;
+            }
+            if (!Visible) Show();
+        }
+
+        public void ApplySettings()
+        {
+            TopMost = Conf.TrafficOnTop;
+            OnTick();
+        }
+
+        void ClosePopup()
+        {
+            if (popup != null && !popup.IsDisposed && popup.Visible) popup.Close();
+        }
+
+        void TogglePopup()
+        {
+            if (popup != null && !popup.IsDisposed && popup.Visible)
+            {
+                popup.Close();
+                return;
+            }
+            popup = new TrafficPopupForm(this);
+            Rectangle wa = Screen.FromPoint(Location).WorkingArea;
+            int x = Right - popup.Width;
+            if (x < wa.Left) x = wa.Left;
+            int y = Top - popup.Height - 2;
+            if (y < wa.Top) y = Bottom + 2;
+            popup.Location = new Point(x, y);
+            popup.Show();
+            popup.Activate();
+        }
+
+        public void OpenDetails()
+        {
+            ClosePopup();
+            if (details != null && !details.IsDisposed)
+            {
+                details.Activate();
+                return;
+            }
+            details = new TrafficDetailsForm();
+            details.FormClosed += delegate { details = null; };
+            details.Show();
+        }
+
+        public void Shutdown()
+        {
+            try { tick.Stop(); } catch { }
+            ClosePopup();
+            if (details != null && !details.IsDisposed) details.Close();
+            if (!IsDisposed) Close();
+        }
+    }
+
+    // ---------------- traffic summary popup ----------------
+    // Shown by clicking the mini window: live totals plus the
+    // processes holding the most connections, and a Details link.
+    class TrafficPopupForm : Form
+    {
+        TrafficMiniForm ownerForm;
+        Label totals;
+        ListView lv;
+        ImageList imgs;
+        Dictionary<string, int> iconCache = new Dictionary<string, int>();
+        System.Windows.Forms.Timer tick;
+
+        public TrafficPopupForm(TrafficMiniForm owner)
+        {
+            ownerForm = owner;
+            FormBorderStyle = FormBorderStyle.FixedSingle;
+            ShowInTaskbar = false;
+            TopMost = true;
+            StartPosition = FormStartPosition.Manual;
+            Font = new Font("Microsoft YaHei UI", 9f);
+            Text = L.ACTIVE_CONN;
+
+            totals = new Label();
+            totals.Location = new Point(10, 8);
+            totals.Size = new Size(280, 20);
+            totals.Font = new Font("Microsoft YaHei UI", 10f, FontStyle.Bold);
+            Controls.Add(totals);
+
+            imgs = new ImageList();
+            imgs.ImageSize = new Size(16, 16);
+            lv = new ListView();
+            lv.View = View.Details;
+            lv.FullRowSelect = true;
+            lv.GridLines = true;
+            lv.HeaderStyle = ColumnHeaderStyle.Nonclickable;
+            lv.SmallImageList = imgs;
+            lv.Columns.Add(L.COL_APP, 196);
+            lv.Columns.Add(L.COL_CONN, 72);
+            lv.Location = new Point(10, 34);
+            lv.Size = new Size(280, 200);
+            Controls.Add(lv);
+
+            var link = new LinkLabel();
+            link.Text = L.VIEW_DETAILS;
+            link.AutoSize = true;
+            link.Location = new Point(238, 242);
+            link.LinkClicked += delegate { ownerForm.OpenDetails(); Close(); };
+            Controls.Add(link);
+
+            RefreshData();
+            Deactivate += delegate { Close(); };
+            FormClosed += delegate { if (tick != null) tick.Stop(); };
+
+            tick = new System.Windows.Forms.Timer();
+            tick.Interval = 1000;
+            tick.Tick += delegate { RefreshData(); };
+            tick.Start();
+        }
+
+        void RefreshData()
+        {
+            totals.Text = "↑ " + Traffic.Format(Traffic.UpRate) + "    ↓ " + Traffic.Format(Traffic.DownRate);
+            var list = ProcNet.Collect();
+            int rows = Math.Min(list.Count, 10);
+            lv.BeginUpdate();
+            lv.Items.Clear();
+            for (int i = 0; i < rows; i++)
+            {
+                ProcConn pc = list[i];
+                var item = new ListViewItem(pc.Name);
+                item.SubItems.Add(pc.Count.ToString());
+                int idx = IconHelper.IndexFor(imgs, iconCache, pc);
+                if (idx >= 0) item.ImageIndex = idx;
+                lv.Items.Add(item);
+            }
+            lv.EndUpdate();
+            int lvH = 26 + rows * 21;
+            if (lvH < 47) lvH = 47;
+            lv.Size = new Size(280, lvH);
+            ClientSize = new Size(300, 34 + lvH + 30);
+            foreach (Control c in Controls)
+            {
+                var lk = c as LinkLabel;
+                if (lk != null) lk.Location = new Point(ClientSize.Width - lk.Width - 12, 34 + lvH + 4);
+            }
+        }
+    }
+
+    // ---------------- traffic details window ----------------
+    // The big window: every process with its connection count, and
+    // the selected process's endpoints underneath.
+    class TrafficDetailsForm : Form
+    {
+        Label totals;
+        ListView lvProcs;
+        ListView lvEnds;
+        ImageList imgs;
+        Dictionary<string, int> iconCache = new Dictionary<string, int>();
+        List<ProcConn> data = new List<ProcConn>();
+        System.Windows.Forms.Timer tick;
+
+        public TrafficDetailsForm()
+        {
+            Text = L.DETAILS_TITLE;
+            StartPosition = FormStartPosition.CenterScreen;
+            ClientSize = new Size(720, 470);
+            Font = new Font("Microsoft YaHei UI", 9f);
+
+            totals = new Label();
+            totals.Location = new Point(12, 10);
+            totals.Size = new Size(696, 20);
+            totals.Font = new Font("Microsoft YaHei UI", 10f, FontStyle.Bold);
+            Controls.Add(totals);
+
+            imgs = new ImageList();
+            imgs.ImageSize = new Size(16, 16);
+            lvProcs = new ListView();
+            lvProcs.View = View.Details;
+            lvProcs.FullRowSelect = true;
+            lvProcs.GridLines = true;
+            lvProcs.SmallImageList = imgs;
+            lvProcs.Columns.Add(L.COL_APP, 300);
+            lvProcs.Columns.Add(L.COL_TYPE, 110);
+            lvProcs.Columns.Add(L.COL_CONN, 110);
+            lvProcs.Location = new Point(12, 38);
+            lvProcs.Size = new Size(696, 238);
+            lvProcs.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+            lvProcs.SelectedIndexChanged += delegate { FillEndpoints(); };
+            Controls.Add(lvProcs);
+
+            lvEnds = new ListView();
+            lvEnds.View = View.Details;
+            lvEnds.FullRowSelect = true;
+            lvEnds.GridLines = true;
+            lvEnds.Columns.Add(L.COL_PROTO, 70);
+            lvEnds.Columns.Add(L.COL_LOCAL, 200);
+            lvEnds.Columns.Add(L.COL_REMOTE, 200);
+            lvEnds.Columns.Add(L.COL_STATE, 120);
+            lvEnds.Location = new Point(12, 288);
+            lvEnds.Size = new Size(696, 170);
+            lvEnds.Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+            Controls.Add(lvEnds);
+
+            RefreshData();
+            FormClosed += delegate { if (tick != null) tick.Stop(); };
+
+            tick = new System.Windows.Forms.Timer();
+            tick.Interval = 2000;
+            tick.Tick += delegate { RefreshData(); };
+            tick.Start();
+        }
+
+        void RefreshData()
+        {
+            Traffic.Sample();
+            totals.Text = string.Format(L.TOTAL_FMT,
+                Traffic.Format(Traffic.DownRate), Traffic.Format(Traffic.UpRate));
+            int selPid = -1;
+            if (lvProcs.SelectedItems.Count > 0)
+            {
+                var tag = lvProcs.SelectedItems[0].Tag as ProcConn;
+                if (tag != null) selPid = tag.Pid;
+            }
+            data = ProcNet.Collect();
+            lvProcs.BeginUpdate();
+            lvProcs.Items.Clear();
+            foreach (ProcConn pc in data)
+            {
+                var item = new ListViewItem(pc.Name);
+                item.SubItems.Add(pc.IsSystem ? L.SYS_TYPE : L.THIRD_TYPE);
+                item.SubItems.Add(pc.Count.ToString());
+                item.Tag = pc;
+                int idx = IconHelper.IndexFor(imgs, iconCache, pc);
+                if (idx >= 0) item.ImageIndex = idx;
+                lvProcs.Items.Add(item);
+                if (pc.Pid == selPid) item.Selected = true;
+            }
+            lvProcs.EndUpdate();
+            FillEndpoints();
+        }
+
+        void FillEndpoints()
+        {
+            lvEnds.Items.Clear();
+            if (lvProcs.SelectedItems.Count == 0) return;
+            var pc = lvProcs.SelectedItems[0].Tag as ProcConn;
+            if (pc == null) return;
+            lvEnds.BeginUpdate();
+            foreach (string[] ep in pc.Endpoints)
+            {
+                var item = new ListViewItem(ep[0]);
+                item.SubItems.Add(ep[1]);
+                item.SubItems.Add(ep[2]);
+                item.SubItems.Add(ep[3]);
+                lvEnds.Items.Add(item);
+            }
+            lvEnds.EndUpdate();
+        }
+    }
+
     // ---------------- tray app ----------------
     class TrayApp : ApplicationContext
     {
         NotifyIcon tray;
         ContextMenuStrip menu;
         System.Windows.Forms.Timer timer;
+        TrafficMiniForm trafficWin;
         NetState state;
         ReleaseInfo pendingUpdate;
         bool balloonPending = false;
@@ -1054,6 +1918,8 @@ namespace NetworkSwitch
             };
             timer.Start();
             Rebuild();
+            trafficWin = new TrafficMiniForm(tray);
+            trafficWin.ApplySettings();
             var once = new System.Windows.Forms.Timer();
             once.Interval = 15000;
             once.Tick += delegate { once.Stop(); ScheduleAutoCheck(); };
@@ -1319,6 +2185,7 @@ namespace NetworkSwitch
                 check = f.CheckRequested;
             }
             Rebuild();
+            if (trafficWin != null) trafficWin.ApplySettings();
             if (check) ManualUpdateCheck();
         }
 
@@ -1380,6 +2247,7 @@ namespace NetworkSwitch
 
         void Quit()
         {
+            if (trafficWin != null) { trafficWin.Shutdown(); trafficWin = null; }
             timer.Stop();
             tray.Visible = false;
             tray.Dispose();
