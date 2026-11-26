@@ -108,7 +108,7 @@ using System.Windows.Forms;
 [assembly: System.Reflection.AssemblyDescription("Switch the active network connection between two gateways on the same LAN from the system tray. Windows counterpart of swiftbar-network-switch.")]
 [assembly: System.Reflection.AssemblyCompany("Otakun and Dash")]
 [assembly: System.Reflection.AssemblyProduct("Network Switch")]
-[assembly: System.Reflection.AssemblyVersion("1.3.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.4.0.0")]
 
 namespace NetworkSwitch
 {
@@ -1766,6 +1766,7 @@ namespace NetworkSwitch
         ImageList imgs;
         Dictionary<string, int> iconCache = new Dictionary<string, int>();
         List<ProcConn> data = new List<ProcConn>();
+        int maxConn = 1;
         System.Windows.Forms.Timer tick;
 
         public TrafficDetailsForm()
@@ -1795,6 +1796,11 @@ namespace NetworkSwitch
             lvProcs.Size = new Size(696, 238);
             lvProcs.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             lvProcs.SelectedIndexChanged += delegate { FillEndpoints(); };
+            // The connections column is drawn as a proportional bar
+            // (same presentation as the Mac version's bar chart).
+            lvProcs.OwnerDraw = true;
+            lvProcs.DrawColumnHeader += delegate(object s, DrawListViewColumnHeaderEventArgs e) { e.DrawDefault = true; };
+            lvProcs.DrawSubItem += LvProcs_DrawSubItem;
             Controls.Add(lvProcs);
 
             lvEnds = new ListView();
@@ -1814,9 +1820,31 @@ namespace NetworkSwitch
             FormClosed += delegate { if (tick != null) tick.Stop(); };
 
             tick = new System.Windows.Forms.Timer();
-            tick.Interval = 2000;
+            tick.Interval = 1000;
             tick.Tick += delegate { RefreshData(); };
             tick.Start();
+        }
+
+        void LvProcs_DrawSubItem(object sender, DrawListViewSubItemEventArgs e)
+        {
+            if (e.ColumnIndex != 2) { e.DrawDefault = true; return; }
+            e.DrawBackground();
+            var pc = e.Item.Tag as ProcConn;
+            int count = pc != null ? pc.Count : 0;
+            var bounds = e.Bounds;
+            var track = new Rectangle(bounds.X + 2, bounds.Y + 3, bounds.Width - 48, bounds.Height - 6);
+            using (var b = new SolidBrush(Color.FromArgb(225, 228, 232)))
+                e.Graphics.FillRectangle(b, track);
+            int w = maxConn > 0 ? (int)(track.Width * (count / (double)maxConn)) : 0;
+            if (w > 0)
+            {
+                var fill = new Rectangle(track.X, track.Y, w, track.Height);
+                using (var b = new SolidBrush(Color.FromArgb(10, 132, 255)))
+                    e.Graphics.FillRectangle(b, fill);
+            }
+            var textRect = new Rectangle(track.Right + 4, bounds.Y, 40, bounds.Height);
+            TextRenderer.DrawText(e.Graphics, count.ToString(), lvProcs.Font, textRect,
+                lvProcs.ForeColor, TextFormatFlags.Right | TextFormatFlags.VerticalCenter);
         }
 
         void RefreshData()
@@ -1831,6 +1859,8 @@ namespace NetworkSwitch
                 if (tag != null) selPid = tag.Pid;
             }
             data = ProcNet.Collect();
+            maxConn = 1;
+            foreach (ProcConn pc in data) if (pc.Count > maxConn) maxConn = pc.Count;
             lvProcs.BeginUpdate();
             lvProcs.Items.Clear();
             foreach (ProcConn pc in data)

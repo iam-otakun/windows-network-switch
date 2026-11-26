@@ -3,6 +3,10 @@
 All notable changes to Network Switch for Windows.
 本项目的重要变更都记在这里。
 
+## v1.4.0 — 2026-11-26
+
+- **Bar chart in Traffic Details / 流量详情改柱形图**: the full Traffic Details window now draws each process's connection count as a proportional bar (blue, scaled to the busiest process) with the number beside it — the same presentation as the macOS version's live bar chart — and the window refreshes every second instead of every two. Process icons, System / Third-Party tags and the endpoints pane are unchanged. / 流量详情大窗里，每个进程的连接数改画成等比柱形（蓝色，以最忙的进程为满格），数字标在柱旁——与 macOS 版实时柱形图同款呈现；刷新间隔由 2 秒改为 1 秒。进程图标、系统/第三方标记与端点列表不变。
+
 ## v1.3.0 — 2026-11-25
 
 - **Traffic mini window / 网速小窗**: a small translucent window now sits directly above the NetworkSwitch tray icon and follows it, showing the live total upload and download rates (adapter counters, sampled every second) with an orange ↑ and a green ↓, modelled on the Huorong widget Fred used to use. **Click** it and a summary popup opens: the same totals plus the processes holding the most connections; its **View details** link opens a full window listing every process (System / Third-Party, connection count) and the selected process's TCP/UDP endpoints. **Right-click** the mini window for **Always on top**, **Auto-hide when dock to screen edge**, **Auto-hide in fullscreen mode**, **View details** and **Close network statistics window**; the whole feature can also be switched off in **Settings…**. One honest limitation: per-process up/down *rates* are not shown, because on Windows those need a kernel driver (that is how Huorong does it) — user-mode APIs expose per-process connections, so processes are ranked by connection count instead of a made-up speed. / 托盘图标正上方新增一个半透明网速小窗，跟着图标走，实时显示总上传/下载速度（网卡计数器，每秒采样），橙色 ↑、绿色 ↓，样式仿 Fred 用惯的火绒小窗。**单击**弹出概要：总速 + 连接数最多的进程列表；点其中**查看详情**打开大窗，列出全部进程（系统/第三方、连接数）与所选进程的 TCP/UDP 端点。**右键**小窗有**始终置顶**、**靠近屏幕边缘时自动隐藏**、**全屏时自动隐藏**、**查看详情**、**关闭网速小窗**；整个功能也可在**设置…**里关掉。一个如实的限制：不显示逐进程的上/下行速度——Windows 上那需要内核驱动（火绒正是靠驱动），用户态接口只能拿到逐进程连接，所以进程按连接数排序，不编造速度。
