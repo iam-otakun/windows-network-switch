@@ -1,3 +1,7 @@
+> **This repository has moved / 本仓库已迁移** — development continues in [**NetworkSwitch**](https://github.com/iam-otakun/NetworkSwitch), where the macOS and Windows editions live together from v2.0.0 on. This repository is archived and kept for history only. / 后续开发已转到 [NetworkSwitch](https://github.com/iam-otakun/NetworkSwitch)：macOS 与 Windows 两端自 v2.0.0 起同住一个仓库。本仓库已归档，仅作历史留存。
+
+---
+
 # Network Switch for Windows / 网络切换（Windows 版）
 
 A tiny Windows system-tray app that switches the active network connection between **two gateways on the same LAN** with one click. Locations are kept as **Profiles** — take the same laptop home and to the office, and each place has its own pair of gateways. It is the Windows counterpart of the macOS SwiftBar plugin [swiftbar-network-switch](https://github.com/iam-otakun/swiftbar-network-switch), and both editions share the **same config file format**.
